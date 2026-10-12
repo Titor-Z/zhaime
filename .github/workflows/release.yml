@@ -60,7 +60,7 @@ jobs:
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
           MANIFESTS: apps/macos/Cargo.toml
-        run: tools/release/version-check.sh
+        run: bash tools/release/version-check.sh
 
       - name: Fetch product data
         env:
@@ -148,7 +148,7 @@ jobs:
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
           MANIFESTS: apps/windows/server/Cargo.toml apps/windows/tsf/Cargo.toml apps/windows/settings/Cargo.toml
-        run: tools/release/version-check.sh
+        run: bash tools/release/version-check.sh
 
       - name: Fetch product data
         shell: bash
@@ -213,7 +213,7 @@ jobs:
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
           MANIFESTS: apps/linux/server/Cargo.toml
-        run: tools/release/version-check.sh
+        run: bash tools/release/version-check.sh
 
       - name: Fetch product data
         env:
