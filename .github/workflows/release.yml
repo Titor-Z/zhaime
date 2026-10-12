@@ -1,49 +1,50 @@
-# 发版：推 v<版本> 标签，三平台并行打包，直接挂到同一个 Release。
+# 发版：推 v<版本> 标签，三个平台并行打包，挂到同一个 GitHub Release。
+# 只发一个平台就推 <平台>-v<版本>：macos-v0.3.0 / windows-v0.3.0 / linux-v0.3.0。
+# 手滑或失败要重跑：Actions → release → Run workflow，填标签名（同一个标签，不用重打）。
 #
-# 推单平台标签只打那一个平台：macos-v<版本> / windows-v<版本> / linux-v<版本>。
-#   gh tag push v0.1.0            # 三平台
-#   gh tag push windows-v0.1.0    # 只出 Windows
-#
-# 版本号从标签读，不校验 Cargo.toml —— 壳的版本号只在「关于」页显示，与发版标签
-# 无关，绑死反而每次发版都要改三个文件。
+# 版本号以标签为准，各平台壳的 Cargo.toml 必须与标签一致（`-dev` 也不能有），对不上直接失败：
+# 安装包文件名、Inno 的版本信息、「关于」页显示的版本都从 Cargo.toml 取，版本对不上就会打出名字与 Release 不符的包。
+# 发版步骤见 docs/notes/release.md。
 #
 # 产物：
-#   macOS    Zha-<版本>-macos-<系统版本>.pkg（arm64 + x86_64 通用）
-#   Windows  Zha-<版本>-windows-<系统版本>-setup.exe
-#   Linux    Zha-<版本>-linux.tar.gz（AppImage 解包）
+#    macOS   target/pkg/qingjian-<版本>-macos-{arm64,x86_64}.pkg
+#    Windows target/installer/qingjian-<版本>-windows-x86_64-setup.exe
+#    Linux   target/linux-package/qingjian-<版本>-linux-x86_64.tar.gz
 #
-# 代码签名/公证是可选的，配了下面这些 secret 才做，没配就出未签名包
-# （未签名的 macOS 包只能自己右键打开，Windows 会弹 SmartScreen）：
-#   ZHA_CERT_P12           Developer ID Application + Installer 两张证书导出的 .p12，base64
-#   ZHA_CERT_PASSWORD      .p12 的密码
-#   ZHA_SIGN_IDENTITY      "Developer ID Application: 名字 (TEAMID)"
-#   ZHA_INSTALLER_IDENTITY "Developer ID Installer: 名字 (TEAMID)"
-#   ZHA_NOTARY_KEY         App Store Connect API 密钥 .p8，base64
-#   ZHA_NOTARY_KEY_ID      密钥的 Key ID
-#   ZHA_NOTARY_ISSUER      密钥的 Issuer ID
-#
-# 不做的事：不生成 releases.json、不签版本索引、不触发任何官网——软件里没有自动检查更新，
-# 下载走 GitHub Releases 页面本身。
+# 代码签名是可选的：配了 macOS 那七个 secret 才签名 + 公证，没配就出 ad-hoc 包；
+# Windows 目前没有证书（QINGJIAN_UIACCESS=0，没签名的 exe 带 uiAccess 起不来，build.ps1 缺省就是 0）。
 name: release
 
 on:
   push:
     tags: ['v*', 'macos-v*', 'windows-v*', 'linux-v*']
-  workflow_dispatch:          # 手动重跑，不用再打一个新标签
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 要发的标签名，如 v0.3.0（须已存在）
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   macos:
-    if: startsWith(github.ref, 'refs/tags/macos-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: |
+      startsWith(github.event.inputs.tag || github.ref_name, 'v') ||
+      startsWith(github.event.inputs.tag || github.ref_name, 'macos-v')
     runs-on: macos-26
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0      # bundle.sh 用提交数当构建号
           persist-credentials: false
 
@@ -54,7 +55,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
+      - name: 解析版本
+        id: version
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          MANIFESTS: apps/macos/Cargo.toml
+        run: tools/release/version-check.sh
+
       - name: Fetch product data
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: tools/release/data-fetch.sh
 
       - name: Detect optional secrets
@@ -104,28 +114,49 @@ jobs:
       - name: Build pkg (x86_64)
         run: QINGJIAN_TARGET=x86_64-apple-darwin apps/macos/scripts/bundle.sh --pkg
 
-      - name: Upload
+      - name: 上传到 Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
           files: target/pkg/*.pkg
 
   windows:
-    if: startsWith(github.ref, 'refs/tags/windows-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    if: |
+      startsWith(github.event.inputs.tag || github.ref_name, 'v') ||
+      startsWith(github.event.inputs.tag || github.ref_name, 'windows-v')
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
           persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
           toolchain: 1.96.0
+          # 安装包另带一份 32 位 TSF DLL（企业微信 / WPS 这类 32 位应用只能加载它）
+          targets: i686-pc-windows-msvc
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
+      - name: 解析版本
+        id: version
+        shell: bash
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          MANIFESTS: apps/windows/server/Cargo.toml apps/windows/tsf/Cargo.toml apps/windows/settings/Cargo.toml
+        run: tools/release/version-check.sh
+
       - name: Fetch product data
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: tools/release/data-fetch.sh
 
+      # 与开发机同版本（7.1.0，自带简体中文翻译；Chocolatey 只有 6.x，6 的安装包不带简中）。钉死 GitHub Release 上的文件与摘要。
       - name: Install Inno Setup 7.1.0
         shell: pwsh
         run: |
@@ -136,23 +167,33 @@ jobs:
           $actual = (Get-FileHash -Path $exe -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $expected) { throw "Inno Setup 安装程序 SHA-256 不符：$actual" }
           Start-Process -FilePath $exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait
+          & "${env:ProgramFiles}\Inno Setup 7\ISCC.exe" --version
 
+      # build.ps1 里做四件事：编三个产物 + 32 位 DLL、挑出自包含 Windows App Runtime、
+      # 从 server 的 Cargo.toml 读版本、编 qingjian.iss。
       - name: Build installer
         shell: pwsh
-        run: |
-          & "${env:ProgramFiles}\Inno Setup 7\ISCC.exe" "apps\windows\installer\qingjian.iss"
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps\windows\installer\build.ps1
 
-      - name: Upload
+      - name: 上传到 Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
           files: target/installer/*.exe
 
   linux:
-    if: startsWith(github.ref, 'refs/tags/linux-v') || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
+    if: |
+      startsWith(github.event.inputs.tag || github.ref_name, 'v') ||
+      startsWith(github.event.inputs.tag || github.ref_name, 'linux-v')
+    # 插件链接的是构建机上的 Fcitx5，与已验证的 Ubuntu 26.04 一致
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
           persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
@@ -164,16 +205,48 @@ jobs:
       - name: Install Fcitx5 build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libfcitx5-dev pkg-config devscripts cmake
+          sudo apt-get install -y cmake g++ pkg-config libssl-dev \
+            libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev nlohmann-json3-dev fcitx5
+
+      - name: 解析版本
+        id: version
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          MANIFESTS: apps/linux/server/Cargo.toml
+        run: tools/release/version-check.sh
 
       - name: Fetch product data
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: tools/release/data-fetch.sh
 
       - name: Build package
         run: apps/linux/scripts/package.sh
 
-      - name: Upload
+      # 装进临时目录再卸载：包里文件齐、校验过得去、两个二进制在这台机器上找得到全部动态库
+      - name: Smoke-test package
+        run: |
+          work="$RUNNER_TEMP/package-test"
+          rm -rf "$work"
+          mkdir -p "$work"
+          tar -xzf target/linux-package/*.tar.gz -C "$work"
+          cd "$work"/qingjian-*/
+          export XDG_DATA_HOME="$work/data"
+          ./install.sh --prefix "$work/prefix"
+          for binary in "$work/prefix/bin/qingjian-linux-server" "$work/prefix/lib/fcitx5/qingjian.so"; do
+            [[ -x "$binary" ]] || { echo "$binary 不存在" >&2; exit 1; }
+            ldd "$binary" > "$work/ldd.txt" || true
+            if grep -q 'not found' "$work/ldd.txt"; then
+              echo "$binary 缺动态库：" >&2
+              grep 'not found' "$work/ldd.txt" >&2
+              exit 1
+            fi
+          done
+
+      - name: 上传到 Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
           files: target/linux-package/*.tar.gz
