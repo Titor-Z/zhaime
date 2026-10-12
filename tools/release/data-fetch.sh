@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# 按 tools/release/data.lock 下载并校验单包产品数据；旧锁仍可读取分离的模型附件。
+# 按 tools/release/data.lock 下载并校验单包产品数据。
 #
 #   tools/release/data-fetch.sh            # 下载 + 校验 + 解开
 #   tools/release/data-fetch.sh --verify   # 只校验 target/release-data/ 里已下载的文件
+#
+# 数据源默认仍是上游的 data-vN Release（词库与语言模型的语料统计产物只那里有）。
+# 换成自己的数据源时给 QINGJIAN_DATA_REPO 指定「owner/repo」即可，哈希仍按 data.lock 校验：
+#   QINGJIAN_DATA_REPO=Titor-Z/zhaime tools/release/data-fetch.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOCK="$ROOT/tools/release/data.lock"
 OUT="$ROOT/target/release-data"
-REPO="qingjian-team/qingjian"
+REPO="${QINGJIAN_DATA_REPO:-qingjian-team/qingjian}"
 ASSETS=(qingjian-data.tar.gz)
 cd "$ROOT"
 
