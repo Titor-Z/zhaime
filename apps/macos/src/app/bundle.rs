@@ -46,4 +46,4 @@ impl BundleInfo {
 }
 
 /// 与 `Info.plist` 里的 `CFBundleIdentifier` 保持一致。
-pub(crate) const DEFAULT_IDENTIFIER: &str = "app.qingjian.inputmethod";
+pub(crate) const DEFAULT_IDENTIFIER: &str = "app.zha.inputmethod";

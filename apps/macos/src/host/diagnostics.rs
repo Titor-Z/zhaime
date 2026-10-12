@@ -8,7 +8,7 @@ impl Host {
         use std::fmt::Write as _;
 
         let mut out = String::new();
-        let _ = writeln!(out, "青简 {} ({})", self.version, self.build);
+        let _ = writeln!(out, "札输入法 {} ({})", self.version, self.build);
         let os = NSProcessInfo::processInfo().operatingSystemVersionString();
         let _ = writeln!(out, "macOS {os} · {}", std::env::consts::ARCH);
         let _ = writeln!(out, "主词库：{} 条", self.engine.dictionary().len());

@@ -263,7 +263,7 @@ fn main() {
         fuzzy = config.fuzzy.any(),
         cloud = config.predict.enabled,
         sessions = router.session_count(),
-        "青简 Windows Server 就绪"
+        "札输入法 Windows Server 就绪"
     );
 
     serve(router);

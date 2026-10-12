@@ -207,7 +207,7 @@ fn set_bool_starts_from_template_when_missing() {
     let _ = std::fs::remove_file(&path);
     Config::set_bool(&path, "predict", "enabled", true).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
-    assert!(text.contains("# 青简输入法配置"));
+    assert!(text.contains("# 札输入法配置"));
     assert!(Config::load(&path).unwrap().predict.enabled);
     let _ = std::fs::remove_file(&path);
 }

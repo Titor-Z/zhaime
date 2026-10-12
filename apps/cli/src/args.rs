@@ -31,7 +31,7 @@ pub fn default_config_file() -> PathBuf {
 }
 
 #[derive(Debug, Parser)]
-#[command(name = "qingjian", about = "青简输入法 Core 测试工具")]
+#[command(name = "qingjian", about = "札输入法 Core 测试工具")]
 pub struct Args {
     /// 词库路径（TSV）。缺省：data/generated/dict.tsv 存在就用它，否则 assets/sample/dict.tsv
     #[arg(long)]

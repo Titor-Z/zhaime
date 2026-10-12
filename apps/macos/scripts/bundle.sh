@@ -15,12 +15,12 @@
 #   QINGJIAN_INSTALLER_IDENTITY  "Developer ID Installer: …"     给 .pkg 签名
 #   QINGJIAN_NOTARY_PROFILE      notarytool store-credentials 存的 keychain profile 名，设了就公证并钉票据
 #
-# 首次 --install 后要在「系统设置 → 键盘 → 输入法」里添加「青简」；输入法列表不刷新就注销再登录。
+# 首次 --install 后要在「系统设置 → 键盘 → 输入法」里添加「札输入法」；输入法列表不刷新就注销再登录。
 # pkg 装的不用：postinstall 会以登录用户身份跑 `qingjian-macos --register` 注册并启用。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-APP_NAME="Qingjian"
+APP_NAME="Zha"
 BIN_NAME="qingjian-macos"
 PROFILE="${PROFILE:-release}"
 APP="$ROOT/target/$APP_NAME.app"
@@ -63,7 +63,7 @@ BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
   -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
 # 卸载脚本随包，装了 pkg 的用户从 Resources 里运行
 cp apps/macos/scripts/uninstall.sh "$APP/Contents/Resources/uninstall.sh"
-# 输入源名字按系统语言本地化（中文系统显示「青简」，其他显示 Qingjian）
+# 输入源名字按系统语言本地化（中文系统显示「札输入法」，其他显示 Zha）
 cp -R apps/macos/resources/*.lproj "$APP/Contents/Resources/"
 # 词库与释义表打进 Resources。data/generated/ 里有生成好的产品数据（自建词库 + 语言模型 + LLM 释义表）就用它，
 # 否则用 assets/sample/ 的样例。没有数据管道的机器跑 tools/release/data-fetch.sh 按 tools/release/data.lock 下载。
@@ -78,12 +78,12 @@ cp assets/wubi/wubi86.tsv "$APP/Contents/Resources/wubi/"
 if [[ -f data/generated/dict.tsv || -f data/generated/dict.qj ]]; then
   # 词库与语言模型打成 .qj（mmap 直接用），TSV 比 .qj 新时重新打包；只有 .qj（CI 从数据包解出来的）就直接用
   if [[ -f data/generated/dict.tsv && ( ! -f data/generated/dict.qj || data/generated/dict.tsv -nt data/generated/dict.qj ) ]]; then
-    cargo run --release -q -p qingjian-dict-convert -- pack dict --name "青简基础词库" \
+    cargo run --release -q -p qingjian-dict-convert -- pack dict --name "札输入法基础词库" \
       --license "MIT AND Unicode-3.0" --attribution "通用规范汉字表；现代汉语常用词表（liuxilu 校对版）；THUOCL（清华大学自然语言处理实验室，MIT）；读音 Unihan（Unicode）" \
       --source https://github.com/qingjian-team/qingjian/tree/main/assets/lexicon
   fi
   if [[ -f data/generated/lm-bigram.tsv && ( ! -f data/generated/lm.qj || data/generated/lm-bigram.tsv -nt data/generated/lm.qj ) ]]; then
-    cargo run --release -q -p qingjian-dict-convert -- pack lm --name "青简语言模型（中文维基 + LCCC，青简词库分词）" \
+    cargo run --release -q -p qingjian-dict-convert -- pack lm --name "札输入法语言模型（中文维基 + LCCC，札输入法词库分词）" \
       --license "CC-BY-SA-4.0 AND MIT" --attribution "中文维基百科（CC BY-SA 4.0）；LCCC（清华大学 CoAI，MIT）"
   fi
   cp data/generated/dict.qj "$APP/Contents/Resources/"
@@ -114,7 +114,7 @@ if [[ -f data/generated/dict.tsv || -f data/generated/dict.qj ]]; then
     fi
     if [[ ! -f "$out" || "$src" -nt "$out" ]]; then
       cargo run --release -q -p qingjian-dict-convert -- pack glossary --language "$lang" --input "$src" \
-        --name "青简释义表（${lang}）" --license "$license" --attribution "$attribution"
+        --name "札输入法释义表（${lang}）" --license "$license" --attribution "$attribution"
     fi
     cp "$out" "$APP/Contents/Resources/"
   done
@@ -126,15 +126,28 @@ fi
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 # 图标：应用图标从 assets/icon/logo.png 生成 .icns；输入法菜单图标直接用 assets/icon/menu.pdf（矢量，随 Info.plist 的 TISIconIsTemplate 按深浅色反色）
-ICONSET="$ROOT/target/Qingjian.iconset"
+ICONSET="$ROOT/target/Zha.iconset"
 rm -rf "$ICONSET" && mkdir -p "$ICONSET"
 for size in 16 32 128 256 512; do
   sips -z $size $size assets/icon/logo.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
   double=$((size * 2))
   sips -z $double $double assets/icon/logo.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/Qingjian.icns"
-cp assets/icon/menu.pdf "$APP/Contents/Resources/qingjian-menu.pdf"
+# sips 出的 PNG 不压缩，2048 源的图每一档都是几百 KB，整个 .icns 能到 1.5 MB。
+# 图标是纯色块，量化到 256 色没有可见损失，体积降到 1/20。
+if python3 -c 'import PIL' 2>/dev/null; then
+  python3 -I - "$ICONSET" <<'PY'
+import sys
+from PIL import Image
+import pathlib
+for p in sorted(pathlib.Path(sys.argv[1]).glob("*.png")):
+    Image.open(p).convert("RGBA").quantize(
+        colors=256, method=Image.FASTOCTREE, dither=Image.FLOYDSTEINBERG
+    ).save(p, optimize=True)
+PY
+fi
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/Zha.icns"
+cp assets/icon/menu.pdf "$APP/Contents/Resources/zha-menu.pdf"
 # 仓库放在 iCloud 同步的目录（Documents）时新建的 .app 会带上 Finder 扩展属性，codesign 会拒（detritus not allowed）：签名前清掉
 xattr -cr "$APP"
 # Apple Silicon 上未签名的二进制不会被系统加载。有 Developer ID 证书就正式签（开 hardened runtime，公证要求），
@@ -162,7 +175,7 @@ if [[ "${1:-}" == "--pkg" ]]; then
     /usr/libexec/PlistBuddy -c "Add :0:BundleIsRelocatable bool false" "$PKG_DIR/component.plist"
   pkgbuild --root "$PKG_DIR/root" --component-plist "$PKG_DIR/component.plist" \
     --install-location "/Library/Input Methods" --scripts apps/macos/pkg/scripts \
-    --identifier app.qingjian.inputmethod --version "$PKG_VERSION" "$PKG_DIR/$APP_NAME-component.pkg" >/dev/null
+    --identifier app.zha.inputmethod --version "$PKG_VERSION" "$PKG_DIR/$APP_NAME-component.pkg" >/dev/null
   cp apps/macos/pkg/resources/*.html "$PKG_DIR/resources/"
   cp LICENSE "$PKG_DIR/resources/license.txt"
   # 二进制只有一种架构，hostArchitectures 限定只在对应机器上装；另一种架构用 QINGJIAN_TARGET 再打一份

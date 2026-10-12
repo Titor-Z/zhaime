@@ -1,4 +1,4 @@
-//! 输入法进程没有终端，日志只写文件：`~/Library/Logs/Qingjian/qingjian.log.<日期>`。
+//! 输入法进程没有终端，日志只写文件：`~/Library/Logs/Zha/zha.log.<日期>`。
 //!
 //! 按天分文件，只留最近 [`KEEP_DAYS`] 天；文件被用户删掉后下一条日志会重新建（`tracing_appender::rolling`
 //! 一直握着旧文件描述符，删掉后日志会写进已经不在目录里的 inode，看起来就是「日志文件始终不出现」）。
@@ -19,7 +19,7 @@ use tracing_subscriber::{EnvFilter, Registry, reload};
 pub use log_file::LogFile;
 
 /// 日志文件名前缀，后面跟 `.YYYY-MM-DD`。
-pub const FILE_PREFIX: &str = "qingjian.log";
+pub const FILE_PREFIX: &str = "zha.log";
 
 /// 保留最近几天的日志。
 pub const KEEP_DAYS: i32 = 7;
@@ -76,7 +76,7 @@ fn filter_for(level: LogLevel) -> EnvFilter {
 
 /// 日志目录，菜单「打开日志目录」也用。
 pub fn log_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(|home| PathBuf::from(home).join("Library/Logs/Qingjian"))
+    std::env::var_os("HOME").map(|home| PathBuf::from(home).join("Library/Logs/Zha"))
 }
 
 /// 把日志目录里的文件加 `config.toml` 打成桌面上的 `qingjian-logs-<日期>.zip`（`zip -j`，不带目录层级），返回 zip 路径。
@@ -94,7 +94,7 @@ pub fn export_logs() -> Result<PathBuf, String> {
     }
     let desktop = PathBuf::from(std::env::var_os("HOME").ok_or("找不到主目录")?).join("Desktop");
     let zip = desktop.join(format!(
-        "qingjian-logs-{}.zip",
+        "zha-logs-{}.zip",
         jiff::Zoned::now().strftime("%Y-%m-%d")
     ));
     let _ = std::fs::remove_file(&zip);
@@ -141,14 +141,14 @@ mod tests {
 
     #[test]
     fn prune_keeps_recent_files_and_unrelated_names() {
-        let dir = std::env::temp_dir().join("qingjian-log-prune-test");
+        let dir = std::env::temp_dir().join("zha-log-prune-test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         for name in [
-            "qingjian.log.2026-09-04",
-            "qingjian.log.2026-08-29",
-            "qingjian.log.2026-08-28",
-            "qingjian.log.bogus",
+            "zha.log.2026-09-04",
+            "zha.log.2026-08-29",
+            "zha.log.2026-08-28",
+            "zha.log.bogus",
             "notes.txt",
         ] {
             std::fs::write(dir.join(name), "x").unwrap();
@@ -164,9 +164,9 @@ mod tests {
             left,
             [
                 "notes.txt",
-                "qingjian.log.2026-08-29",
-                "qingjian.log.2026-09-04",
-                "qingjian.log.bogus"
+                "zha.log.2026-08-29",
+                "zha.log.2026-09-04",
+                "zha.log.bogus"
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

@@ -40,10 +40,10 @@ fn main() {
     // 安装器的 postinstall 以登录用户身份调 `--register`：注册、启用并切成当前输入源后直接退出，不起 IMK
     if std::env::args().any(|argument| argument == "--register") {
         match app::input_source::register_main_bundle() {
-            Ok(true) => println!("青简输入源已注册、启用并切成当前输入源"),
-            Ok(false) => println!("青简输入源已注册并启用，请在输入法菜单里选择「青简」"),
+            Ok(true) => println!("札输入法输入源已注册、启用并切成当前输入源"),
+            Ok(false) => println!("札输入法输入源已注册并启用，请在输入法菜单里选择「札输入法」"),
             Err(error) => {
-                eprintln!("青简输入源注册失败：{error}");
+                eprintln!("札输入法输入源注册失败：{error}");
                 std::process::exit(1);
             }
         }
