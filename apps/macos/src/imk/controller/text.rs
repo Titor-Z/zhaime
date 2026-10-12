@@ -32,7 +32,11 @@ impl QingjianInputController {
             return false;
         };
         let c = char::from(*byte);
-        host::with(|h| h.indicator.update());
+        host::with(|h| {
+            if let Some(indicator) = h.indicator.as_mut() {
+                indicator.update();
+            }
+        });
         // 缓冲区为空时敲 ? 先进问字模式（配置 `[shortcut] question_mark`，缺省关），中英文模式都行：
         // 后面跟字母就是在问字，跟别的键就还原成问号
         if !composing

@@ -12,7 +12,7 @@ use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::{MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{NSMenu, NSStatusBar, NSStatusItem, NSVariableStatusItemLength};
-use objc2_foundation::{NSObject, NSObjectProtocol, NSString, NSTimer, ns_string};
+use objc2_foundation::{NSObject, NSObjectProtocol, NSProcessInfo, NSString, NSTimer, ns_string};
 
 use crate::imk::modifiers;
 
@@ -21,6 +21,9 @@ const POLL_INTERVAL: f64 = 0.25;
 
 /// 停用后隔多久才把状态项收起：焦点在输入框之间挪动时 deactivate 与下一次 activate 只隔几十毫秒。
 const COLLAPSE_DELAY: f64 = 0.5;
+
+/// 建菜单栏状态项的最低 macOS 大版本：12 上 `statusItemWithLength` 会 trap（见 [`ModeIndicator::new`]）。
+const MIN_MACOS_FOR_STATUS_ITEM: isize = 13;
 
 pub struct ModeIndicator {
     /// 菜单栏状态项。
@@ -45,8 +48,27 @@ pub struct ModeIndicator {
 }
 
 impl ModeIndicator {
-    pub fn new(mtm: MainThreadMarker) -> Self {
+    /// 建菜单栏状态项；**建不出来就不建**，输入法照常工作，只是没有「中 / 英」那个图标。
+    ///
+    /// macOS 12 上这一步会直接崩死：`NSStatusBar statusItemWithLength` 在 AppKit 里
+    /// `NSCGSPanic`（`+[NSCGSStatusItem _statusItemWithWindowID:...]` → `NSCGSPanicv`），
+    /// 那是直接 `__builtin_trap`，**不是可捕获的 ObjC 异常**（objc2 的异常边界接不住，
+    /// 实测照样 EXC_BAD_INSTRUCTION），进程一起来就挂，于是系统报「键盘布局不可用」、
+    /// 候选窗也不出。菜单栏图标只是个提示，不值得为它赔上整个输入法，所以低版本直接跳过。
+    pub fn new(mtm: MainThreadMarker) -> Option<Self> {
+        let major = NSProcessInfo::processInfo().operatingSystemVersion().majorVersion;
+        if major < MIN_MACOS_FOR_STATUS_ITEM {
+            tracing::warn!(
+                major,
+                "macOS {major} 上建菜单栏状态项会崩在 AppKit 的 NSCGSPanic，跳过「中 / 英」图标"
+            );
+            return None;
+        }
         let item = NSStatusBar::systemStatusBar().statusItemWithLength(0.0);
+        Some(Self::from_item(item, mtm))
+    }
+
+    fn from_item(item: Retained<NSStatusItem>, mtm: MainThreadMarker) -> Self {
         item.setAutosaveName(Some(ns_string!("QingjianModeIndicator")));
         item.setVisible(true);
         Self {
@@ -163,12 +185,20 @@ define_class!(
     impl ModeMonitor {
         #[unsafe(method(tick:))]
         fn tick(&self, _timer: Option<&AnyObject>) {
-            crate::host::with(|h| h.indicator.update());
+            crate::host::with(|h| {
+                if let Some(indicator) = h.indicator.as_mut() {
+                    indicator.update();
+                }
+            });
         }
 
         #[unsafe(method(collapse:))]
         fn collapse(&self, _timer: Option<&AnyObject>) {
-            crate::host::with(|h| h.indicator.collapse());
+            crate::host::with(|h| {
+                if let Some(indicator) = h.indicator.as_mut() {
+                    indicator.collapse();
+                }
+            });
         }
     }
 

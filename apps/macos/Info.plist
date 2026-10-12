@@ -23,8 +23,15 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
-	<key>LSBackgroundOnly</key>
+	<!-- 原本写 13.0，但代码里没有任何 macos(13.x) 可用性标注、二进制的部署目标也是 10.12，
+	     这个下限只是声明。写 13.0 会让 macOS 12 直接拒绝启动（kLSIncompatibleSystemVersionErr），
+	     选它时进程起不来、系统退化成裸键盘输入，看起来就是「只能输入英文」。 -->
+	<string>12.0</string>
+	<!-- 原本写的是 LSBackgroundOnly（纯后台应用），但青简要建菜单栏状态项与候选窗 NSPanel，
+	     那是后台应用不允许的：NSStatusBar statusItemWithLength 会在 AppKit 里 NSCGSPanic，
+	     进程一起来就挂，于是选它时系统报「键盘布局不可用」、候选窗也不出。
+	     LSUIElement 才是对的语义：不显示 Dock 图标，但可以有自己的界面。 -->
+	<key>LSUIElement</key>
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>

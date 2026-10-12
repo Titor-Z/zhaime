@@ -116,9 +116,14 @@ pub fn init(mtm: MainThreadMarker, info: &BundleInfo) -> Result<(), HostError> {
     }
     let window = CandidateWindow::new(mtm);
     window.set_click_handler(Box::new(crate::imk::click));
-    let indicator = ModeIndicator::new(mtm);
+    let mut indicator = ModeIndicator::new(mtm);
+    if indicator.is_none() {
+        tracing::warn!("菜单栏状态项建不起来，没有「中 / 英」图标；输入法照常工作");
+    }
     let menu = InputMenu::new(mtm, version);
-    indicator.set_menu(&menu.ns_menu());
+    if let Some(indicator) = indicator.as_mut() {
+        indicator.set_menu(&menu.ns_menu());
+    }
     let preferences = PreferencesWindow::new(mtm, &languages, version, &info.build);
     let monitor = PredictMonitor::new(mtm);
     let watch = ConfigWatch::new(mtm);

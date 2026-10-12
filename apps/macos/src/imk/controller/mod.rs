@@ -103,7 +103,9 @@ define_class!(
                     h.engine.set_application(bundle);
                     h.refresh_text_replacements();
                     h.reload_config_if_changed();
-                    h.indicator.activate();
+                    if let Some(indicator) = h.indicator.as_mut() {
+                        indicator.activate();
+                    }
                     h.watch.start();
                 });
             });
@@ -139,7 +141,9 @@ define_class!(
                 host::with(|h| {
                     h.cancel_prediction();
                     h.window.hide();
-                    h.indicator.deactivate();
+                    if let Some(indicator) = h.indicator.as_mut() {
+                        indicator.deactivate();
+                    }
                     h.watch.stop();
                     h.engine.break_chain();
                     h.engine.flush_learning();
@@ -150,7 +154,9 @@ define_class!(
                 recover_from_panic(client);
                 // 善后里没做的收尾：学习数据还是要落盘
                 host::with(|h| {
-                    h.indicator.deactivate();
+                    if let Some(indicator) = h.indicator.as_mut() {
+                        indicator.deactivate();
+                    }
                     h.watch.stop();
                     h.engine.flush_learning();
                 });

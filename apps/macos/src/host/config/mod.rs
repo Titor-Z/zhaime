@@ -92,8 +92,10 @@ impl Host {
             self.reload_dictionaries();
         }
         let cloud_active = self.engine.prediction_enabled();
-        self.indicator.set_cloud(cloud_active);
-        self.indicator.update();
+        if let Some(indicator) = self.indicator.as_mut() {
+            indicator.set_cloud(cloud_active);
+            indicator.update();
+        }
         self.menu.sync(&config, cloud_active, self.settings.error());
         let key_present = config
             .predict

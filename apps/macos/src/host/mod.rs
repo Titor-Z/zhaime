@@ -61,7 +61,8 @@ pub struct Host {
     pub window: CandidateWindow,
 
     /// 菜单栏的中 / 英状态项。
-    pub indicator: ModeIndicator,
+    /// 菜单栏「中 / 英」状态项；系统不让建时为 `None`（macOS 12 会崩，见 `ModeIndicator::new`）。
+    pub indicator: Option<ModeIndicator>,
 
     /// 输入法菜单，挂在状态项和系统输入源菜单上。
     pub menu: InputMenu,

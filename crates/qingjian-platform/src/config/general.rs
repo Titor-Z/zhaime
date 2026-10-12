@@ -170,7 +170,7 @@ impl Default for GeneralConfig {
             english_mode: true,
             full_width_punctuation: true,
             english_full_width_punctuation: false,
-            punct_commits: false,
+            punct_commits: true,
             aux_code_key: qingjian_core::DEFAULT_AUX_CODE_KEY.to_string(),
             aux_code_show: false,
             aux_code_keep_empty: true,
@@ -348,12 +348,13 @@ mod tests {
         assert_eq!(general.page_keys(), ('[', ']'));
     }
 
-    /// 组句中标点先上屏候选缺省关（`[general] punct_commits`），保持标点进英文直输段的老行为。
+    /// 组句中标点先上屏候选缺省开（`[general] punct_commits`）：`nihao,` 一气打完出「你好，」。
+    /// 关掉恢复老行为：标点进英文直输段，于是组句中的标点保持半角。
     #[test]
     fn punct_commits_defaults_off() {
-        assert!(!GeneralConfig::default().punct_commits);
-        let general: GeneralConfig = toml::from_str("punct_commits = true\n").unwrap();
-        assert!(general.punct_commits);
+        assert!(GeneralConfig::default().punct_commits);
+        let general: GeneralConfig = toml::from_str("punct_commits = false\n").unwrap();
+        assert!(!general.punct_commits);
     }
 
     #[test]
