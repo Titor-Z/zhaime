@@ -60,7 +60,8 @@ pub fn build(
     version: &str,
     build: &str,
 ) {
-    let title = NSTextField::labelWithString(&NSString::from_str(&format!("札输入法 {version}")), mtm);
+    let title =
+        NSTextField::labelWithString(&NSString::from_str(&format!("札输入法 {version}")), mtm);
     title.setFont(Some(&NSFont::boldSystemFontOfSize(15.0)));
     layout.place(&title, PAGE_PADDING, layout.inner_width(), ROW_HEIGHT);
     layout.next_row(ROW_HEIGHT);

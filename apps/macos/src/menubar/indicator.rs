@@ -56,7 +56,9 @@ impl ModeIndicator {
     /// 实测照样 EXC_BAD_INSTRUCTION），进程一起来就挂，于是系统报「键盘布局不可用」、
     /// 候选窗也不出。菜单栏图标只是个提示，不值得为它赔上整个输入法，所以低版本直接跳过。
     pub fn new(mtm: MainThreadMarker) -> Option<Self> {
-        let major = NSProcessInfo::processInfo().operatingSystemVersion().majorVersion;
+        let major = NSProcessInfo::processInfo()
+            .operatingSystemVersion()
+            .majorVersion;
         if major < MIN_MACOS_FOR_STATUS_ITEM {
             tracing::warn!(
                 major,

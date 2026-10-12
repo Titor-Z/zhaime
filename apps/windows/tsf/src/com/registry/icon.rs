@@ -8,8 +8,7 @@ const ICON: &[u8] = include_bytes!("../../../resources/qingjian.ico");
 
 /// `%ProgramData%\Zha\zha.ico`。注册是机器级的，别的用户也要能读到，所以不能放用户目录。
 fn path() -> Option<PathBuf> {
-    std::env::var_os("ProgramData")
-        .map(|base| PathBuf::from(base).join("Zha").join("zha.ico"))
+    std::env::var_os("ProgramData").map(|base| PathBuf::from(base).join("Zha").join("zha.ico"))
 }
 
 /// 写不了返回 `None`，调用方注册成无图标。
