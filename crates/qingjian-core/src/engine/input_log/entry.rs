@@ -40,6 +40,8 @@ pub struct CommitEntry {
     pub english: bool,
 
     /// 查询时的候选顺序经过了神经重排（本地整句模型的分已经进了排序）。
+    ///
+    /// 本地整句模型已移除，新日志一律写 `false`；字段留着是为了让旧日志与旧回放工具仍能读（`#[serde(default)]`）。
     #[serde(default)]
     pub rescored: bool,
 

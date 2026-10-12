@@ -48,7 +48,6 @@ pub(crate) enum Message {
     StatusBar(bool),
 
     // 云服务页
-    LocalModel(bool),
     CloudEnabled(bool),
     CloudApiKey(String),
     CloudModel(String),
@@ -115,11 +114,6 @@ pub(crate) enum Message {
     // 关于页
     OpenWebsite,
 
-    // 关于页：检查更新（`UpdateChecked` 的 `None` = 本地开发版没查）
-    UpdateCheck(bool),
-    UpdateChannel(Option<usize>),
-    CheckUpdateNow,
-    UpdateChecked(Option<Result<qingjian_update::UpdateState, String>>),
-    OpenDownload,
+    // 关于页
     OpenRepository,
 }

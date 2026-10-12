@@ -165,7 +165,6 @@ define_class!(
 const MAX_TRANSLATE_CHARS: usize = 500;
 
 /// 给本地整句模型看的光标前文最多读多少字符（Engine 自己再按它的前文长度截）。
-const RESCORE_LOOKBACK: usize = qingjian_core::RESCORE_CONTEXT_CHARS;
 
 /// 登录 / 锁屏窗口的 bundle identifier。
 const LOGIN_WINDOW: &str = "com.apple.loginwindow";

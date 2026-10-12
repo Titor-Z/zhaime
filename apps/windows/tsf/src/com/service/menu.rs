@@ -31,7 +31,6 @@ impl TextService_Impl {
                 indicator.full_width_punctuation
             },
             status_bar: indicator.status_bar,
-            update_available: indicator.update_available,
         };
         match menu::track(owner, point, &state) {
             Some(MenuChoice::Mode { english }) if english != self.mode_state.english() => {
@@ -43,10 +42,7 @@ impl TextService_Impl {
     }
 
     fn send_indicator(&self, command: IndicatorCommand) {
-        if matches!(
-            command,
-            IndicatorCommand::OpenSettings | IndicatorCommand::OpenDownload
-        ) {
+        if matches!(command, IndicatorCommand::OpenSettings) {
             // 设置程序 / 浏览器由 Server 起；前台权在点菜单的这边，让出去它的窗口才能到前面
             let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
         }

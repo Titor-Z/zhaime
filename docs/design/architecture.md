@@ -43,10 +43,8 @@ qingjian/
 │   ├── qingjian-learning/      # 用户词频、用户词、个人英文词、个人 n-gram、个人敲错表（user.tsv / user-words.tsv / user-english.tsv / user-ngram.tsv / user-typos.tsv）、输入日志（input-log.jsonl）、输入统计（usage.tsv）、词汇记录（user-vocab.tsv）
 │   ├── qingjian-predict/       # 云联想：Predictor 的网络实现（OpenAI 兼容接口）
 │   ├── qingjian-lm/            # 整句转换的 bigram 语言模型：LanguageModel 的实现
-│   ├── qingjian-neural/        # 字级 Transformer 的本地推理（candle）：SentenceScorer 的实现，给整句前几条路径重打分
 │   ├── qingjian-format/        # .qj 数据容器：mmap 打开、零拷贝视图、写入器、可落盘的哈希索引（dictionary / lm 依赖它）
 │   ├── qingjian-render/        # 自绘渲染器：候选窗一帧 + 主题 → 位图，各平台贴图
-│   ├── qingjian-update/        # 检查更新：读 releases.json、验 ed25519 签名、按平台与渠道挑新版本
 │   └── qingjian-platform/      # 平台层共用的部分：配置文件、协议类型
 │
 ├── apps/
@@ -78,7 +76,6 @@ qingjian-core
 ├── shortcut        # 快捷候选：日期 / 时间 / 星期、v 表达式模式（四则运算、中文数字），不查词库
 ├── english         # 英文模式候选：词表精确词 / 前缀补全 / 一处编辑纠正（edit.rs），大小写跟着敲的走
 ├── sentence        # 离线整句转换：词图 + bigram Viterbi + 束搜索，LanguageModel trait（qingjian-lm 实现，缺省退化为一元），UserNgram 个人 n-gram（二元 + 三元），Context 上文（前两个词），
-│               #   SentenceScorer trait（qingjian-neural 实现）：convert_paths 出前 K 条路径，Engine（engine/rescoring）按 路径分 + λ·(神经分 − 静态分) 重排，异步时后台线程打分、壳停顿后取
 ├── emoji           # emoji 候选：EmojiTable（词 → emoji，Unicode CLDR 中文 annotations）
 ├── fuzzy           # 模糊音：FuzzyRules（配置 [fuzzy]）把每个音节扩展成多种写法，Expanded 借出给词库多写法查询
 ├── shuangpin       # 双拼：Scheme 七套方案的键位表，decode 把敲的键解成全拼（音节间带 '），Decoded 把上屏消耗换算回键数；切分之后全部复用全拼
@@ -144,7 +141,7 @@ qingjian-dictionary        （纯数据加载与查询，依赖 qingjian-format 
         ▲
 qingjian-core              （定义 Translator / Learner / Predictor trait，依赖 dictionary）
         ▲           ▲            ▲
-qingjian-translate  qingjian-learning  qingjian-predict  qingjian-lm  qingjian-neural   （实现 core 的 trait，依赖 core；learning 另依赖 translate 的 LevelTable 做词汇按级汇总）
+qingjian-translate  qingjian-learning  qingjian-predict  qingjian-lm   （实现 core 的 trait，依赖 core；learning 另依赖 translate 的 LevelTable 做词汇按级汇总）
         ▲           ▲            ▲
 qingjian-platform          （配置文件 Config：general / shortcut / fuzzy / predict 分节，toml_edit 原地改键保留注释；协议类型，可序列化；依赖 core、predict）
         ▲
@@ -198,10 +195,6 @@ CSR 偏移与后继）原样落盘，打开时 mmap 整个文件、校验一遍�
 - 文件 = 32 字节头（魔数 `QINGJIAN`、格式版本、数据种类 `Kind`、分节数）+ 分节表（4 字节标签 + 偏移 + 长度，正文 8 字节对齐）
   + 各分节。第一节固定是 `META`：TOML 的 `Metadata`（名称、许可证 SPDX、署名、来源、版本、条数、生成者），
   偏好设置里的词库列表直接显示它，第三方词库各带各的许可证靠的就是这一节。
-- 数据种类：词库、语言模型、释义表、emoji 表、英文词表，以及本地整句模型 `Kind::Model`——扩展名换成 `.qjm`，
-  三节 `CONF` / `VOCB` / `SAFT` 原样装导出的 `config.json` / `vocab.json` / `model.safetensors`（safetensors 是不透明载荷，
-  mmap 后切片给 candle，张量搬上设备后容器即丢；`META.entries` 记参数量）。`qingjian-neural::find_model(dir)` 先找 `.qjm`、没有再认三件套目录，
-  所以开发直接加载训练直出的目录，随包与用户目录只有一个文件；`dict-convert pack model`（`tools/release/pack-model.sh` 带元数据调它）打包。
 - 数值小端、原生对齐，crate 在大端机器上拒绝编译。字符串分节打开时校验一次 UTF-8，之后 `Text::deref` 走 unchecked
   （曾经每次 deref 都重新校验 30 MB，CLI 直接卡死）。定长结构体用 `zerocopy` 派生，`#[repr(C)]` 且手工排字段消灭填充
   （`KeyIndex` 16 字节、`Slot` 12 字节、`WordEntry` 12 字节、`Successor` 8 字节）。
@@ -326,7 +319,7 @@ CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但�
   Core 在问字模式下不做拼音校验、本地不出候选。
 - 发往云端的上下文默认关闭；开启后 Secure Input 绝不发送，前后观察长度可配置。
   上下文优先从应用读（IMK `attributedSubstringFromRange:`），读不到退回 Core 的本地输入历史（内存环形，可清除）。
-- 个人化优先用在线 n-gram，神经模型只做重排与离线联想，且要过评测门槛（见 roadmap Phase 7）。
+- 个人化优先用在线 n-gram。
 - 两者都依赖本地输入历史，历史必须可查看、可清除。
 
 ## 平台层的技术决定
@@ -493,11 +486,7 @@ CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但�
   收键与运行细节记进 `%LOCALAPPDATA%\Qingjian\logs\tsf.<日期>.log`（与 Server / 设置程序同目录，按天一个文件、留 7 天；多进程追加同一文件）；候选窗口不再由 DLL 自绘（已搬到 Server 进程，见上「候选窗口」），DLL 侧只做 preedit 内联 + 上报光标矩形；云联想已接。
 - **交叉编译验证**：`qingjian-core` / `-dictionary` / `-format` / `-lm` / `-platform` / `apps/windows/{server,tsf}` 已能
   `cargo check --target x86_64-pc-windows-gnu` 通过（借此修掉 `qingjian-format` 里 unix 专有的 `Mmap::advise` 未 `cfg` 的移植 bug）；
-  本机只 `check`，真正编译在 Windows 机器上做（`qingjian-neural` 的 candle 后端在 Windows 走 CPU，已接进 Server，见下「本地整句模型」）。
-- **本地整句模型（Server 进程，与 macOS 的 `host/model/mod.rs` 对齐）**：`server/src/dispatch/rescore/`。启动时 `find_model` 优先找用户 `%APPDATA%\Qingjian\models\hanzhang-tongbian\` 与随包 `data\models\hanzhang-tongbian\`，缺失时回退 `hanzhang-zhiwei`；旧用户目录仍可读取。接受 `.qjm` 单文件或三件套目录；`[model] enabled` 开着就起线程加载并预热（`ModelLoader`），下一次按键 / tick 接上 `set_async_sentence_scorer`。
-  Server 没有定时器：缓冲变化后 `schedule_rescoring` 起防抖，工人循环 `recv_timeout(router.next_tick())` 按 `RescoreState` 的节拍醒来（防抖 80 ms → `request_rescoring`；然后 20 ms 一次 `poll_rescoring`，最多等 2 s），DLL 组句期间每 80 ms 的 `Poll` 也顺带 `tick`。分到了重查一次、重建候选布局（云端词与整句补全留着）、由 Server 自绘的候选窗直接重画，DLL 下一次 `Poll` 拿到新帧更新内联 preedit；翻过页 / 动过高亮不动。热加载 `[model]` 变了才重载 / 卸载。
-  前文：DLL 在**起组句的那次读写编辑会话**里顺手读选区起点前 64 个 UTF-16 单元（`com/edit/surrounding.rs::text_before_caret`，拼音还没插进去、不用再开一次会话），随 `ClientMessage::Surrounding` 单向送来。**密码框与私密输入**（2026-09-12 查了微软文档 / SampleIME / Chromium 源码后定）：
-  TSF 规定键盘类 TIP 必须看上下文的 `GUID_COMPARTMENT_KEYBOARD_DISABLED`（微软文档明说密码框应禁用文本服务、`IS_PASSWORD` 只是标注不提供保护；Chromium 给密码框的上下文设的就是它），
+  本机只 `check`，真正编译在 Windows 机器上做。
   DLL 在 `OnTestKeyDown` / `OnKeyDown` / 保留键里没在组句时先查它（连同 `EMPTYCONTEXT`，`com/context.rs`），非零整键放行、不组句——与 macOS 的 Secure Input 同一语义；
   输入范围（`GUID_PROP_INPUTSCOPE`）只在起组句那次编辑会话里读一次（`com/edit/surrounding.rs::input_context`）：含 `IS_PRIVATE` / 密码 / PIN 之一算**私密**——Chromium 源码里密码框与不学习的输入框映射成 `IS_PRIVATE`（含义「别学」；2026-09-12 box 实测 Edge InPrivate 的网页文本框报的仍是 `IS_SEARCH`，`IS_PRIVATE` 只在密码框见过，这条是兜底）——私密时不读前文，并随 `ClientMessage::Privacy` 告诉 Server（客户端只在变了时发；记事本等不支持该属性的应用 `GetValue` 失败按不私密）。
   Server 按会话记 `private`、焦点切换时重设，Core `Engine::set_private`：学习器与输入日志外面各套一层 `Muted*`（写吞掉、读照常，排序不变），联想 / 翻译 / 释义兜底不发。协议版本见 `qingjian-platform::protocol::PROTOCOL_VERSION`。
@@ -507,7 +496,7 @@ CC-CEDICT 表（`dict-convert cedict`）保留为备用来源，覆盖面广但�
 ### Linux：Fcitx5 / IBus（2026-09-15 定，PR #90 在做）
 
 - 与 Windows 同构：Core 跑在独立的 Rust Server 进程（Unix socket，复用 `qingjian-platform` 的协议），壳只转发按键、上屏与光标位置。
-  词库、语言模型、神经模型、渲染器和字体都在 Server 里，不进 Fcitx5 这个所有输入法共用的进程；Server 崩了不带倒 Fcitx5。
+  词库、语言模型、渲染器和字体都在 Server 里，不进 Fcitx5 这个所有输入法共用的进程；Server 崩了不带倒 Fcitx5。
 - Fcitx5 壳是一层薄 C++ 插件（addon ABI 是 C++ 虚类，纯 Rust 做不了），只做转发，判断都在 Server。
 - 候选窗自绘：Server 出位图并自己开窗（X11 / XWayland 先行），插件只报光标矩形与焦点。
 - IBus 壳以后用 zbus 写成纯 Rust，共用同一个 Server；排在 Fcitx5 真机验收之后。

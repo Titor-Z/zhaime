@@ -56,7 +56,7 @@
   个人折扣上限（3）回放从零学分不出好坏，等 `user-typos.tsv` 能带进回放（`--user-dict`）再看；
   退格重打（组句内、跨上屏）已进输入日志 `retype` 事件（2026-09-12），攒够后先按 `docs/plan/model-eval.md` 的尺子算召回与误纠率，再决定喂不喂个人敲错表；
   整段一处编辑那路仍是逐变体跑整句，长句慢（`nihoama` 1 ms、更长的几毫秒）
-- [x] 个人 n-gram 插值常数（λ 0.8 / K 8 / 上限 0.5 / D 0.75）2026-09-12 回放扫过：K 全平，λ 0.7–0.75 与 0.8 差 0.3 个点、带神经重排后无差，封顶 0.7 起掉；保留现值（`docs/notes/constant-sweep.md`）。
+- [x] 个人 n-gram 插值常数（λ 0.8 / K 8 / 上限 0.5 / D 0.75）2026-09-12 回放扫过：K 全平，λ 0.7–0.75 与 0.8 差 0.3 个点，封顶 0.7 起掉；保留现值（`docs/notes/constant-sweep.md`）。
   「挤掉了」要选四次才翻过「给掉了」是 K 与封顶合起来的设计（一次误选翻不过），不是常数没调
 - [x] 词库缺高频「代词 + 的」（我的 / 你的 / 他的）：2026-09-12 加了短语层 `assets/lexicon/phrases.tsv`（`dict-convert phrases`，语料相邻两三词、对话语料里 ≥ 2000 次、
   边界规则，5400 条：我的 / 好的 / 不知道 / 有没有 / 那我），品牌词 `brand.tsv`（青简 210）；词典词头收不到的这一层以后按同一方法补
@@ -68,11 +68,7 @@
 - [ ] 按输入串记的选择只认字面：`wod` 下选的 我的 惠及不到 `wode`；考虑同时按候选全拼记一份、查询取两者最大
 - [ ] 已经学进用户词的错读音云端词（`我的 wo di`、`我的哦 wo di e` 这类）没有清理入口：偏好设置词库页给「按读音核对用户词」，或一次性脚本
 - [ ] 正式版前的发布可信性（2026-09-12 外部 CI 检查，测试版先不做）：产品数据改不可变 tag 并在仓库锁版本 + SHA（2026-09-16 已做：`data-vN` Release + `tools/release/data.lock` + `data-fetch.sh`）；
-  安装包内容验证（pkg / Setup.exe 里词库、模型、许可齐不齐，`codesign --verify` / `signtool verify`）；`cargo deny`（许可证 + 来源）；`.qj` 读取器越界 fuzz、`qingjian-format` 跑 Miri
-- [ ] 本地整句模型（已进壳并随包发出，见 `docs/notes/neural-rescoring.md`；加载 12 秒是早期首次 Metal 编译的记录，2026-09-12 装机实测 102 ms，划掉）：
-  重排改了切分时应用里的行内拼音要到下一键才更新；日语
-- [ ] 个人微调（LoRA 挂在冻结基模上，基模更新后拿本地日志重训）：先在 train 仓库验证收益，再验 candle CPU 训练能不能跑通，都过了才进壳
-  （闲时门禁、加载时合并权重、开关与一键清除）；每个模型假设先按 `docs/plan/model-eval.md` 写尺子与基线
+  安装包内容验证（pkg / Setup.exe 里词库、许可齐不齐，`codesign --verify` / `signtool verify`）；`cargo deny`（许可证 + 来源）；`.qj` 读取器越界 fuzz、`qingjian-format` 跑 Miri
 - [ ] 个人英文词表没有衰减（2026-09-24 发现）：`learn_english` 只加不减，`insert_english` 里的 `choice_weight` 只决定
   「要不要当第一」（`english_first`），位置只有 0 和 1 两档——用户选一百次中文候选，那条英文还是钉在词级候选第一位。
   于是打不出来时原样上屏攒下的失败拼音（`houxuanshengcheng`、`shururizhi`）会永久占第一页一格，不危险但也不自愈。
@@ -118,12 +114,7 @@
     （防回环），顺带刷指示器 + 上报 Server 让悬浮状态条也同步。纯 DLL 改动、无新协议。
   - [ ] 发版：换 **Certum 开源代码签名证书**重签（开发全程自签 + 本机受信任根，见 `installer/sign-local.ps1`）、
     `windows-v<版本>` 标签与 CI。
-  - [ ] **本地整句模型上 Windows**：Server 已接（`dispatch/rescore/`，CPU 推理，设置「云服务」页有开关，安装包带 `data\model`），待真机验：每次重排的耗时（前文 + 几条路径一次前向，CPU 上可能几十到一百多毫秒，超了就缩前文长度）、模型加载时间；
-    应用光标前文已接（DLL 起组句时读、密码框跳过；2026-09-12 真机验过记事本 / Edge / 终端都读得到，Edge 密码框按 `IS_PRIVATE` 识别），真机看沉浸式应用读不读得到；
-    模型单文件 `.qjm` 已做（2026-09-12，复用 `.qj` 容器 `Kind::Model`，`find_model` 先 `.qjm` 再三件套目录，`pack model` / `tools/release/pack-model.sh`，
-    data Release 传 `model.qjm`，bundle.sh / qingjian.iss 只带一个文件），待 mac 与 box 真机各装一次验加载与重排；
-    密码框已按 TSF 规范做（2026-09-12）：`KEYBOARD_DISABLED` compartment 整键放行不组句，`IS_PRIVATE` / 密码 / PIN 输入范围为私密（组句但不学不记不发云端，`ClientMessage::Privacy` → `Engine::set_private`），box 真机验过：Edge 密码框整键放行；InPrivate 网页文本框报 `IS_SEARCH` 不报 `IS_PRIVATE`，私密路径只靠单测覆盖；CI 两个 job 都从 `data` Release 取 `model.qjm`（已做）。
-- [ ] Linux Fcitx5 后续（默认面板与手动安装已实现）：native Wayland 验证、Server 自绘 / GNOME 位图、神经重排、自动启动与打包；配置同步、跨平台词库
+- [ ] Linux Fcitx5 后续（默认面板与手动安装已实现）：native Wayland 验证、Server 自绘 / GNOME 位图、自动启动与打包；配置同步、跨平台词库
 
 ## 四、其他输入方案
 

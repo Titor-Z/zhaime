@@ -309,7 +309,7 @@ Core 按 `prediction::restates_question` 剔掉：与本地转出的问题相同
 
 「关于」页：版本与构建号（`bundle.sh` 打包时把 git 短哈希与日期塞进环境变量 `QINGJIAN_BUILD`，编译期 `option_env!` 读，直接 `cargo build` 的显示「本地构建」）、
 许可说明（与仓库 `LICENSE` 一致）、随包数据的来源与署名（第三方数据的许可证要求署名在分发物里可见，文案在 `preferences/about.rs`，改数据来源时与 `bundle.sh` 的 `pack` 署名一起改）、
-检查更新（开关、渠道、立即检查，见 [update.md](update.md)）、隐私说明（不上传任何数据；云联想 / 翻译发给用户自己在「云服务」页填的 AI 服务商，不经过作者）与反馈方式：「打开日志目录」「复制诊断信息」
+隐私说明（不上传任何数据；云联想 / 翻译发给用户自己在「云服务」页填的 AI 服务商，不经过作者）与反馈方式：「打开日志目录」「复制诊断信息」
 （版本、系统、加载的数据、抹掉密钥的配置原文、日志目录，写进剪贴板）。
 日志缺省 info 级，不含用户敲的内容；`[general] log_level = "debug"`（「高级」页「详细日志」）才逐键记，`tracing_subscriber::reload` 热切换，`RUST_LOG` 环境变量在时以它为准。
 

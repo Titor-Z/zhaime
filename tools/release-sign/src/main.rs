@@ -1,20 +1,25 @@
-//! 版本索引的签名工具。
+//! 发版产物的签名工具。
 //!
-//!   qingjian-release-sign keygen --out <私钥文件>        # 生成密钥对：私钥写文件（不打印），公钥打印出来填进 qingjian-update
+//!   qingjian-release-sign keygen --out <私钥文件>        # 生成密钥对：私钥写文件（不打印），公钥打印出来填进 PUBLIC_KEYS
 //!   qingjian-release-sign sign <releases.json>           # 私钥取环境变量 QINGJIAN_INDEX_SIGNING_KEY，写 <文件>.sig
-//!   qingjian-release-sign verify <releases.json>         # 按程序内置的公钥验 <文件>.sig
+//!   qingjian-release-sign verify <releases.json>         # 按本文件里的 PUBLIC_KEYS 验 <文件>.sig
 //!
 //! 私钥与公钥都是 base64 的 32 字节，签名是 base64 的 64 字节。
+//!
+//! 客户端不再内置这套验签（自动更新已移除），本工具只用于自己核对发布出去的签名是否配套。
 
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use clap::{Parser, Subcommand};
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use thiserror::Error;
 
 const KEY_ENV: &str = "QINGJIAN_INDEX_SIGNING_KEY";
+
+/// 信任的发版公钥（base64 的 32 字节 ed25519 公钥）；换钥时新旧并列一段时间。私钥在 CI 密钥 `QINGJIAN_INDEX_SIGNING_KEY` 里。
+const PUBLIC_KEYS: &[&str] = &["2qNCMwKGMzaBOsHQLHUornqcopNzmrVBKAmICEl9rkk="];
 
 #[derive(Parser)]
 #[command(name = "qingjian-release-sign")]
@@ -53,11 +58,14 @@ enum SignError {
     #[error("{KEY_ENV} is not a base64 32-byte key")]
     MalformedKey,
 
-    #[error("signing key does not match any public key built into qingjian-update")]
+    #[error("signing key does not match any public key built into this tool")]
     ForeignKey,
 
-    #[error("{0}")]
-    Verify(#[from] qingjian_update::UpdateError),
+    #[error("signature is not a base64 64-byte value")]
+    MalformedSignature,
+
+    #[error("signature does not match any trusted public key")]
+    UntrustedSignature,
 }
 
 fn main() {
@@ -73,11 +81,29 @@ fn run(command: Command) -> Result<(), SignError> {
         Command::Sign { file } => sign(&file),
         Command::Verify { file } => {
             let signature = std::fs::read_to_string(signature_path(&file))?;
-            qingjian_update::verify(&std::fs::read(&file)?, &signature)?;
+            verify(&std::fs::read(&file)?, &signature)?;
             println!("{}: signature ok", file.display());
             Ok(())
         }
     }
+}
+
+/// 验分离签名：`signature` 是 `<文件>.sig` 的内容（base64 的 64 字节），任何一把信任的公钥验过就算数。
+fn verify(message: &[u8], signature: &str) -> Result<(), SignError> {
+    let bytes = STANDARD
+        .decode(signature.trim())
+        .map_err(|_| SignError::MalformedSignature)?;
+    let signature = Signature::from_slice(&bytes).map_err(|_| SignError::MalformedSignature)?;
+    let trusted = PUBLIC_KEYS.iter().filter_map(|key| {
+        let bytes: [u8; 32] = STANDARD.decode(key).ok()?.try_into().ok()?;
+        VerifyingKey::from_bytes(&bytes).ok()
+    });
+    for key in trusted {
+        if key.verify_strict(message, &signature).is_ok() {
+            return Ok(());
+        }
+    }
+    Err(SignError::UntrustedSignature)
 }
 
 fn keygen(out: &Path) -> Result<(), SignError> {
@@ -108,7 +134,7 @@ fn sign(file: &Path) -> Result<(), SignError> {
     let key = SigningKey::from_bytes(&seed);
     // 私钥与程序里的公钥对不上时签出来的索引所有客户端都不认，当场拦下
     let public = STANDARD.encode(key.verifying_key().to_bytes());
-    if !qingjian_update::PUBLIC_KEYS.contains(&public.as_str()) {
+    if !PUBLIC_KEYS.contains(&public.as_str()) {
         return Err(SignError::ForeignKey);
     }
     let signature = STANDARD.encode(key.sign(&std::fs::read(file)?).to_bytes());

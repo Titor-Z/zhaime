@@ -18,11 +18,6 @@ sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else sh
 
 TAG="$(lock_value tag)"
 [[ -n "$TAG" ]] || { echo "$LOCK 里没有 tag" >&2; exit 1; }
-LEGACY_MODEL="$(lock_value model.qjm)"
-if [[ -n "$LEGACY_MODEL" ]]; then
-  ASSETS+=(model.qjm)
-  [[ -n "$(lock_value model-p2c.qjm)" ]] && ASSETS+=(model-p2c.qjm)
-fi
 mkdir -p "$OUT"
 
 if [[ "${1:-}" != "--verify" ]]; then
@@ -44,40 +39,17 @@ for f in "${ASSETS[@]}"; do
 done
 [[ "${1:-}" == "--verify" ]] && exit 0
 
-if [[ -n "$LEGACY_MODEL" ]]; then
-  mkdir -p data/generated data/models/hanzhang-zhiwei
-  tar -xzf "$OUT/qingjian-data.tar.gz" -C data/generated
-  cp "$OUT/model.qjm" data/models/hanzhang-zhiwei/model.qjm
-  MODEL_SOURCE=data/models/hanzhang-zhiwei/model.qjm
-  P2C_MODEL_SOURCE=""
-  if [[ -n "$(lock_value model-p2c.qjm)" ]]; then
-    mkdir -p data/models/hanzhang-tongbian
-    cp "$OUT/model-p2c.qjm" data/models/hanzhang-tongbian/model.qjm
-    P2C_MODEL_SOURCE=data/models/hanzhang-tongbian/model.qjm
-  fi
-else
-  tar -xzf "$OUT/qingjian-data.tar.gz" -C "$ROOT"
-  MODEL_SOURCE=data/models/hanzhang-zhiwei/hanzhang-zhiwei-small.qjm
-  P2C_MODEL_SOURCE=data/models/hanzhang-tongbian/hanzhang-tongbian-small.qjm
-  [[ -f "$MODEL_SOURCE" && -f "$P2C_MODEL_SOURCE" && -f data/generated/dict.qj ]] || {
-    echo "产品数据包缺少词库或含章模型（$TAG）" >&2; exit 1;
-  }
-fi
+tar -xzf "$OUT/qingjian-data.tar.gz" -C "$ROOT"
+[[ -f data/generated/dict.qj ]] || {
+  echo "产品数据包缺少词库（$TAG）" >&2; exit 1;
+}
 # 解出来的 mtime 比 checkout 出来的 TSV 旧，bundle.sh 会以为要重打
 find data/generated -type f -exec touch {} +
-touch "$MODEL_SOURCE"
-[[ -n "$P2C_MODEL_SOURCE" ]] && touch "$P2C_MODEL_SOURCE"
 echo "产品数据 $TAG 已就位"
 
 if [[ -n "${GITHUB_ENV:-}" ]]; then
   {
     echo "DATA_TAG=$TAG"
     echo "DATA_SHA256=$(lock_value qingjian-data.tar.gz)"
-    echo "MODEL_SHA256=$(sha256 "$MODEL_SOURCE")"
-    if [[ -n "$P2C_MODEL_SOURCE" ]]; then
-      echo "P2C_MODEL_SHA256=$(sha256 "$P2C_MODEL_SOURCE")"
-    else
-      echo "P2C_MODEL_SHA256="
-    fi
   } >> "$GITHUB_ENV"
 fi

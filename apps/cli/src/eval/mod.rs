@@ -8,8 +8,6 @@
 
 pub mod coverage;
 mod extract;
-pub mod generate;
-pub mod p2c;
 mod pair;
 mod report;
 mod transcribe;
@@ -157,12 +155,6 @@ fn evaluate(
             return serde_json::json!({"text": pair.text, "pinyin": pair.pinyin, "error": error.to_string()});
         }
     };
-    // 异步重打分：像壳一样停顿后请求、等结果、再查一次；等的时间也算进查询耗时
-    let query = if crate::rescoring::settle(engine) {
-        engine.query().unwrap_or(query)
-    } else {
-        query
-    };
     let elapsed = started.elapsed();
     report.query_time += elapsed;
     report.slowest_query = report.slowest_query.max(elapsed);
@@ -231,7 +223,4 @@ pub enum EvalError {
         #[source]
         source: std::io::Error,
     },
-
-    #[error("P2C generation failed: {0}")]
-    Generate(#[from] qingjian_neural::NeuralError),
 }

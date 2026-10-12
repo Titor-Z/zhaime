@@ -5,7 +5,6 @@ use super::*;
 mod code;
 mod converting;
 mod english_tail;
-mod generating;
 mod lookup;
 mod modes;
 mod phonetic;
@@ -24,7 +23,6 @@ impl Engine {
     /// 光标停在拼音中间时只按光标前的那段算候选（`ni|hao` 出 你），光标后的拼音留着，
     /// 上屏之后接着组句；见 [`Composition::scope`]。
     pub fn query(&self) -> Result<Query, ParseError> {
-        self.last_rescored.set(false);
         let mut query = match self.query_inner() {
             Ok(query) => query,
             Err(error) => {
@@ -66,7 +64,6 @@ impl Engine {
                 .take(QuerySnapshot::MAX_CANDIDATES)
                 .map(|c| c.text.clone())
                 .collect(),
-            rescored: self.last_rescored.get(),
         });
 
         if self.traditional

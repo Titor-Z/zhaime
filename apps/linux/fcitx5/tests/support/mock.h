@@ -16,8 +16,7 @@ struct Mock {
 
     std::vector<Json> messages;
 
-    /// 收到的 Poll 次数；rescore 模式第一条回换序帧。
-    int polls = 0;
+
 
     explicit Mock(const std::string &mode) {
         char path[] = "/tmp/qingjian-plugin-XXXXXX";
@@ -62,11 +61,6 @@ struct Mock {
             if (message.contains("DisplayAcknowledged")) continue;
             if (message.contains("Poll")) {
                 assert(message.at("Poll").at("session") == session);
-                if (mode == "rescore" && ++polls == 1) {
-                    frame["candidates"]["items"] = Json::parse(R"([{"text":"你好","translation":{"senses":[{"text":"hello","fresh":true}]}},{"text":"","translation":null},{"text":"","translation":null}])");
-                    frame["highlight"] = 0;
-                    identity["revision"] = identity.at("revision").get<uint64_t>() + 1;
-                }
                 writeMessage(fd, {{"Update", {{"session", session}, {"identity", identity}, {"frame", frame}}}});
                 continue;
             }

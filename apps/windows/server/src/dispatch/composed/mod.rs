@@ -3,7 +3,9 @@
 mod state;
 
 use qingjian_core::{Candidate, CandidateLayout, CandidateList, CloudWord, Query, SurroundingText};
-use qingjian_platform::protocol::{Frame, PROTOCOL_VERSION, PreeditKind, PreeditSegment};
+use qingjian_platform::protocol::{
+    Frame, PROTOCOL_VERSION, PreeditKind, PreeditSegment, SessionId,
+};
 
 pub(super) use self::state::{Composed, TypedKeys};
 use super::Router;
@@ -16,11 +18,10 @@ impl Router {
         self.sentence = None;
         if self.engine.composition().is_empty() {
             self.composed = None;
+            self.clear_surrounding();
             self.cancel_prediction();
-            self.stop_rescoring();
             return;
         }
-        self.attach_loaded_model();
         let built = self.engine.query().ok().map(|query| {
             let (preedit, cursor, typed_keys) = marked_parts(&query);
             (query.candidates.items.clone(), preedit, cursor, typed_keys)
@@ -48,7 +49,6 @@ impl Router {
                 Composed::Raw { text, cursor }
             }
         });
-        self.schedule_rescoring();
     }
 
     /// 拉一次云联想结果：云端词并进候选布局，整句补全记下；翻译评审时结果是译文。
@@ -90,9 +90,23 @@ impl Router {
         }
     }
 
+    /// 组句结束：应用报来的光标前文作废（下一段组句 DLL 会再送）。
+    pub(super) fn clear_surrounding(&mut self) {
+        self.surrounding_before.clear();
+    }
+
+    /// DLL 送来聚焦会话的光标前文：记下来给云联想当 `before` 上下文，并带着新前文重发一次联想。
+    /// 组句已经结束 / 不是聚焦会话的丢掉。
+    pub(super) fn set_surrounding(&mut self, session: SessionId, text: String) {
+        if self.focused != Some(session) || self.engine.composition().is_empty() {
+            return;
+        }
+        self.surrounding_before = text;
+        self.refresh_prediction();
+    }
+
     /// DLL 送来新的光标前文后重发一次云联想：作废在飞的空上下文请求，让云端拿得到 before。
-    pub(super) fn refresh_prediction(&mut self) {
-        let Some(Composed::Candidates { layout, .. }) = &self.composed else {
+    pub(super) fn refresh_prediction(&mut self) {        let Some(Composed::Candidates { layout, .. }) = &self.composed else {
             return;
         };
         let local = layout.local().to_vec();
@@ -339,7 +353,7 @@ mod tests {
             session: SessionId(1),
             text: "别的内容".to_owned(),
         });
-        router.stop_rescoring();
+        router.handle(ClientMessage::Commit { session: SessionId(1) });
         assert!(router.surrounding_for_prediction().is_none());
     }
 

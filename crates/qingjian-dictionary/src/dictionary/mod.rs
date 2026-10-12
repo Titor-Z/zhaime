@@ -280,6 +280,9 @@ impl Dictionary {
             );
             return Ok(dictionary);
         }
+        // 上面逐条校验把整个文件读了一遍，那些干净映射页会留在 RSS 里。校验已过就交还内核，
+        // 查询时按需缺页回来；见 `Container::drop_resident_pages`。
+        container.drop_resident_pages();
         tracing::debug!(
             entries = slots.len(),
             keys = index.len(),

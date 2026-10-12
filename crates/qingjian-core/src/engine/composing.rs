@@ -84,14 +84,14 @@ impl Engine {
         self.page_turns = self.page_turns.saturating_add(1);
     }
 
-    /// 往输入日志记一条会话信息（版本、平台、本地模型开没开）。壳在启动和打开日志时调。
+    /// 往输入日志记一条会话信息（版本、平台）。壳在启动和打开日志时调。
     pub fn log_session(&mut self, version: &str, platform: &str) {
         self.flush_passthrough();
         self.logger.record(InputLogEntry::Session {
             v: INPUT_LOG_VERSION,
             version: version.to_owned(),
             platform: platform.to_owned(),
-            model: self.has_sentence_scorer(),
+            model: false,
             scheme: self.scheme_key(),
         });
     }
@@ -210,7 +210,6 @@ impl Engine {
         self.aux_code = None;
         self.chain.leave_buffer();
         // 壳给的光标前文只对这段组句有效，下一段第一键再读
-        self.rescoring_before = None;
         self.retype_snapshot = None;
         self.composition_started = None;
         self.page_turns = 0;

@@ -91,14 +91,6 @@ impl Host {
         if force || config.dictionaries != self.applied_dictionaries {
             self.reload_dictionaries();
         }
-        if self.applied_model.as_ref() != Some(&config.model) {
-            if config.model.enabled {
-                self.load_local_model();
-            } else {
-                self.unload_local_model();
-            }
-            self.applied_model = Some(config.model.clone());
-        }
         let cloud_active = self.engine.prediction_enabled();
         self.indicator.set_cloud(cloud_active);
         self.indicator.update();
@@ -115,9 +107,7 @@ impl Host {
             key_present,
             self.settings.error(),
             &self.dictionary_list,
-            &self.update_status,
         );
-        self.sync_update();
     }
 
     /// 配置里的自定义短语，`[general] system_text_replacements` 开着时再并上系统的文本替换，一起推给 Engine。
@@ -219,29 +209,6 @@ impl Host {
         if self.last_flush.elapsed() >= LEARNING_FLUSH_INTERVAL {
             self.engine.flush_learning();
             self.last_flush = std::time::Instant::now();
-        }
-        if let Some(updates) = &self.updates {
-            updates.poll(&self.settings.config().update);
-        }
-        self.sync_update();
-    }
-
-    /// 检查更新的状态变了就刷菜单里的「有新版本」与「关于」页；没变什么都不做。
-    pub fn sync_update(&mut self) {
-        let Some(updates) = &self.updates else {
-            return;
-        };
-        let config = self.settings.config();
-        let status = UpdateStatus {
-            available: updates.available(&config.update).map(|found| found.version),
-            checking: updates.checking(),
-            checked: updates.checked_at() > 0,
-            dev_build: updates.is_dev_build(),
-        };
-        if status != self.update_status {
-            self.menu.sync_update(status.available.as_deref());
-            self.preferences.sync_update(config, &status);
-            self.update_status = status;
         }
     }
 

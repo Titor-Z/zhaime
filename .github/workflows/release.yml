@@ -13,7 +13,7 @@
 #   QINGJIAN_NOTARY_ISSUER       密钥的 Issuer ID
 # 版本索引的签名（必须，没配门禁直接失败）：
 #   QINGJIAN_INDEX_SIGNING_KEY   releases.json 的 ed25519 私钥（base64 的 32 字节，tools/release-sign keygen 生成），
-#                                公钥在 crates/qingjian-update/src/index/signature.rs；软件内检查更新只认签过名的索引
+#                                公钥在 tools/release-sign/src/main.rs 的 PUBLIC_KEYS；软件内已无自动检查更新，签名只给官网与将来的下载器用
 # 发版后让官网重新构建（也可选）：
 #   QINGJIAN_WEB_TOKEN           fine-grained PAT，对 qingjian-team/qingjian-web 有 Contents: read and write
 #                                （官网由 Cloudflare 按仓库提交自动构建，tools/release/bump-website.sh 往那边推一个小提交）
@@ -145,7 +145,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tools/release/data-fetch.sh
-          ls -la data/generated data/generated/dicts data/models/hanzhang-zhiwei data/models/hanzhang-tongbian
+          ls -la data/generated data/generated/dicts
 
       - name: Import signing certificates
         if: steps.secrets.outputs.sign == 'true'
@@ -228,7 +228,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tools/release/data-fetch.sh
-          ls -la data/generated data/generated/dicts data/models/hanzhang-zhiwei data/models/hanzhang-tongbian
+          ls -la data/generated data/generated/dicts
 
       # 与开发机同版本（7.1.0，自带简体中文翻译；Chocolatey 只有 6.x，6 的安装包不带简中）。钉死 GitHub Release 上的文件。
       - name: Install Inno Setup 7.1.0
@@ -283,7 +283,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tools/release/data-fetch.sh
-          ls -la data/generated data/generated/dicts data/models/hanzhang-zhiwei data/models/hanzhang-tongbian
+          ls -la data/generated data/generated/dicts
 
       - name: Build package
         run: apps/linux/scripts/package.sh

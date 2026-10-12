@@ -93,6 +93,10 @@ impl BigramModel {
         if successors.iter().any(|s| s.word as usize >= count) {
             return Err(LmError::Corrupt("successor points outside the word table"));
         }
+        // 上面的校验把整个文件每一页都读了一遍，那些干净的文件映射页会一直留在 RSS 里
+        // （`lm.qj` 有几十 MB，等于常驻了几十 MB）。校验已过，把这些页交还给内核：
+        // 下次真正查词时按需缺页回来，页缓存还在，代价是一次 page fault。
+        container.drop_resident_pages();
         let mut model = Self {
             words,
             entries,

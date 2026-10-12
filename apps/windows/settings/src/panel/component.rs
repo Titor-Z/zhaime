@@ -2,7 +2,7 @@
 
 use qingjian_platform::{
     Appearance, CandidateRenderer, Config, DEFAULT_ENGLISH_CANDIDATES_ON_WINDOWS, LayoutMode,
-    LogLevel, PreeditMode, ShiftLetter, UpdateChannel,
+    LogLevel, PreeditMode, ShiftLetter,
 };
 use qingjian_render::ThemeLibrary;
 use windows_reactor::*;
@@ -30,11 +30,6 @@ impl Component for Settings {
             recorder: Recorder::Idle,
             record_box: ElementRef::new(),
             notice: Notice::default(),
-            update_state: Self::update_state_path()
-                .map(|path| qingjian_update::UpdateState::load(&path))
-                .unwrap_or_default(),
-            update_checking: false,
-            update_error: None,
             dictionary_status: String::new(),
             families: qingjian_render::system_fonts::families(),
             font_query: None,
@@ -153,7 +148,6 @@ impl Component for Settings {
             Message::StatusBar(on) => self.save("status_bar", "enabled", on),
 
             // 云服务页
-            Message::LocalModel(on) => self.save("model", "enabled", on),
             Message::CloudEnabled(on) => self.save("predict", "enabled", on),
             Message::CloudApiKey(value) => self.save("predict", "api_key", value),
             Message::CloudModel(value) => self.save("predict", "model", value),
@@ -298,37 +292,6 @@ impl Component for Settings {
 
             // 关于页
             Message::OpenWebsite => open_with_explorer(about::WEBSITE_URL),
-            Message::OpenDownload => open_with_explorer(qingjian_update::DOWNLOAD_URL),
-
-            // 关于页：检查更新
-            Message::UpdateCheck(on) => self.save("update", "check", on),
-            Message::UpdateChannel(Some(i)) if i < UpdateChannel::ALL.len() => {
-                self.save("update", "channel", UpdateChannel::ALL[i].key());
-            }
-            Message::CheckUpdateNow => {
-                let Some(path) = Self::update_state_path() else {
-                    return;
-                };
-                if self.update_checking {
-                    return;
-                }
-                self.update_checking = true;
-                self.update_error = None;
-                let config = self.config.update.clone();
-                context.spawn_background(move |_cancel| {
-                    let result =
-                        qingjian_update::Checker::check_blocking(&path, about::VERSION, &config);
-                    Message::UpdateChecked(result.map(|r| r.map_err(|error| error.to_string())))
-                });
-            }
-            Message::UpdateChecked(result) => {
-                self.update_checking = false;
-                match result {
-                    Some(Ok(state)) => self.update_state = state,
-                    Some(Err(error)) => self.update_error = Some(error),
-                    None => {}
-                }
-            }
             Message::OpenRepository => open_with_explorer(about::REPOSITORY_URL),
 
             // 下拉被清空 / 越界：不改

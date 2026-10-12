@@ -638,7 +638,6 @@ fn input_log_records_a_retype_when_keys_change_after_backspace_in_composition() 
     };
     assert_eq!(commit.keys, "kaifa");
     assert_eq!(commit.pages, 0);
-    assert!(!commit.rescored);
     assert!(matches!(
         &entries[1],
         InputLogEntry::Retype { before, after, of: 1 } if before == "kaifs" && after == "kaifa"

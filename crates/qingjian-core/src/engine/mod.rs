@@ -20,7 +20,6 @@ mod prediction;
 mod privacy;
 mod query;
 mod raw;
-mod rescoring;
 mod session;
 mod setup;
 mod statistics;
@@ -71,9 +70,7 @@ use crate::history::InputHistory;
 use crate::parser::{self, ParseError, Segmentation};
 use crate::punctuation::Punctuation;
 use crate::ranking::{self, Scored};
-use crate::sentence::{
-    self, Conversion, Interpolation, LanguageModel, NoLanguageModel, Personal, SentenceScorer,
-};
+use crate::sentence::{self, Conversion, Interpolation, LanguageModel, NoLanguageModel, Personal};
 use crate::shortcut;
 use crate::shuangpin::Scheme;
 
@@ -137,27 +134,6 @@ pub struct Engine {
     /// 整句转换的语言模型，缺省为 [`NoLanguageModel`]（退化成一元词频）。
     language_model: Box<dyn LanguageModel>,
 
-    /// 整句路径的同步神经重打分器（字级 Transformer，查询里当场打分；CLI 评测用）。
-    sentence_scorer: Option<Box<dyn SentenceScorer>>,
-
-    /// 异步重打分：后台线程里的打分器，壳在停顿后送任务、轮询结果（见 [`rescoring`]）。
-    rescorer: Option<rescoring::RescoreWorker>,
-
-    /// 「前文 + 整句文本 → 神经分」缓存，同步与异步打分共用。
-    neural_cache: std::cell::RefCell<rescoring::NeuralCache>,
-
-    /// 壳给的应用里光标前的文本；`None` 时前文用本会话历史。
-    rescoring_before: Option<String>,
-
-    /// 重打分时神经得分的权重 λ：最终分 = 路径分 + λ·(神经分 − 静态分)。
-    neural_weight: f64,
-
-    /// 只有路径分与最优路径差距在这么多 nat 以内的路径才参与重排：差距大的多半是个人 n-gram 拉开的，通用模型不该翻盘。
-    neural_margin: f64,
-
-    /// 重打分给模型看的前文长度（本会话最近上屏的字符数），0 为不给前文。
-    neural_context: usize,
-
     /// 个人 n-gram 与静态模型插值的参数；只有回放调参会改（`set_interpolation`），壳用缺省值。
     interpolation: Interpolation,
 
@@ -179,9 +155,6 @@ pub struct Engine {
 
     /// 输入日志条目的序号。
     log_sequence: u64,
-
-    /// 最近一次查询的候选顺序是否经过神经重排（`rescore_paths` 置位，`query` 开头清零），写进输入日志。
-    last_rescored: std::cell::Cell<bool>,
 
     /// 这段组句里第一次退格前的缓冲区：上屏时与最终键串不同就记一条 `retype`。
     retype_snapshot: Option<String>,
@@ -365,27 +338,11 @@ const PREDICTION_CANDIDATE_HINTS: usize = 5;
 /// 一次查询最多给壳多少条候选。同音字最多的音节也不到这个数，再往后都是长词，没人会翻到。
 const MAX_CANDIDATES: usize = 500;
 
-/// 神经重打分看 Viterbi 的前几条路径：束宽是 8，再多也没有。
-const RESCORE_PATHS: usize = 6;
-
-/// 长输入最多给几条整句候选（重排后的前几条路径）：一条不够用，长句错一个字就得拆开重打。
+/// 长输入最多给几条整句候选：一条不够用，长句错一个字就得拆开重打。
 const SENTENCE_CANDIDATES: usize = 3;
 
 /// 短于这么多音节的不给备选整句：那时候选表里的词级候选比另一种读法有用。
 const ALTERNATE_MIN_SYLLABLES: usize = 4;
-
-/// 短于这么多字母的不让模型直接生成整句：那么短的输入词级候选够用，生成的几十毫秒不值。
-const MIN_GENERATED_LETTERS: usize = 6;
-
-/// 神经重打分的缺省权重 λ（见 `Engine::neural_weight`）：整句评测集上 0.5 到 1.0 一样好、0.75 最高（见 docs/notes/neural-rescoring.md），
-/// 取 0.5 给个人 n-gram 留余量；回放里看到的「λ 大整句掉」是那把尺子的偏差。
-pub const NEURAL_WEIGHT: f64 = 0.5;
-
-/// 神经重打分的缺省门槛（nat）：路径分落后最优路径超过这么多的不参与重排。缺省不设（4 nat 试过没帮助），留作调参的旋钮。
-pub const NEURAL_MARGIN: f64 = f64::INFINITY;
-
-/// 重打分给模型看的前文：本次会话最近上屏的这么多个字符。
-pub const RESCORE_CONTEXT_CHARS: usize = 64;
 
 impl Engine {
     pub fn new(dictionary: Dictionary) -> Self {
@@ -408,22 +365,14 @@ impl Engine {
             shift_letter_compose: false,
             predictor: Box::new(NoPredictor),
             language_model: Box::new(NoLanguageModel),
-            sentence_scorer: None,
-            rescorer: None,
-            neural_cache: std::cell::RefCell::new(rescoring::NeuralCache::default()),
-            rescoring_before: None,
-            neural_weight: NEURAL_WEIGHT,
-            neural_margin: NEURAL_MARGIN,
             interpolation: Interpolation::DEFAULT,
             typo_costs: TypoCosts::DEFAULT,
-            neural_context: RESCORE_CONTEXT_CHARS,
             correction_cache: std::cell::RefCell::new(None),
             span_cache: std::cell::RefCell::new(sentence::SpanCache::default()),
             recent_commits: Vec::new(),
             logger: input_log::MutedLogger::new(Box::new(NoInputLogger)),
             private: false,
             log_sequence: 0,
-            last_rescored: std::cell::Cell::new(false),
             retype_snapshot: None,
             passthrough_pending: String::new(),
             page_turns: 0,

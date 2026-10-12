@@ -63,8 +63,8 @@ impl Router {
     pub(super) fn reset_composition(&mut self) {
         self.engine.break_chain();
         self.engine.clear();
+        self.clear_surrounding();
         self.cancel_prediction();
-        self.stop_rescoring();
         self.composed = None;
         self.translation = None;
         self.pending_selection = None;

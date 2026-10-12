@@ -10,7 +10,6 @@ mod config;
 mod diagnostics;
 mod dictionaries;
 mod init;
-mod model;
 mod presenting;
 mod session;
 mod settings;
@@ -31,8 +30,8 @@ use qingjian_lm::BigramModel;
 use qingjian_platform::extra_dictionaries;
 use qingjian_platform::{
     Appearance, AppsConfig, CandidateRenderer, DEFAULT_ENGLISH_CANDIDATES_ON, DictionariesConfig,
-    GeneralConfig, KeyCombo, LEARNING_LANGUAGE_OFF, LayoutMode, LocalModelConfig, LogLevel,
-    Modifiers, PAGE_KEY_OPTIONS, PreeditMode, Scheme, ShortcutConfig, UpdateChannel,
+    GeneralConfig, KeyCombo, LEARNING_LANGUAGE_OFF, LayoutMode, LogLevel, Modifiers,
+    PAGE_KEY_OPTIONS, PreeditMode, Scheme, ShortcutConfig,
 };
 use qingjian_predict::{
     CloudGlossFiller, CloudPredictor, ConnectionTest, PredictConfig, PredictError,
@@ -44,13 +43,12 @@ use crate::app::{Settings, logging, paths};
 use crate::candidates::{CandidateWindow, Frame, Preedit, Row};
 use crate::error::HostError;
 use crate::menubar::{InputMenu, MenuAction, ModeIndicator};
-use crate::preferences::{PreferencesWindow, Setting, SettingValue, UpdateStatus};
+use crate::preferences::{PreferencesWindow, Setting, SettingValue};
 
 use cloud::{CloudTestMonitor, PredictMonitor};
 use config::{ConfigWatch, TextReplacement};
 pub use dictionaries::DictionaryInfo;
 pub use init::init;
-use model::RescoreMonitor;
 use presenting::Notice;
 pub use presenting::TranslationJob;
 pub use session::Session;
@@ -164,25 +162,6 @@ pub struct Host {
     /// 连通性测试的轮询定时器。
     cloud_test_monitor: CloudTestMonitor,
 
-    /// 本地整句模型的防抖与轮询定时器。
-    rescore: RescoreMonitor,
-
-    /// 正在后台加载的模型；加载完接到 Engine 上就清掉。
-    model_loader: Option<
-        std::sync::mpsc::Receiver<
-            Result<Box<dyn qingjian_core::sentence::SentenceScorer>, qingjian_neural::NeuralError>,
-        >,
-    >,
-
-    /// 上次套用的 `[model]`，变了才重载 / 卸载。
-    applied_model: Option<LocalModelConfig>,
-
-    /// 检查更新；拿不到数据目录时没有。
-    updates: Option<qingjian_update::Checker>,
-
-    /// 菜单与「关于」页上正显示的更新状态，变了才刷界面。
-    update_status: UpdateStatus,
-
     /// 当前会话的候选、高亮、页码、preedit。
     pub session: Session,
 
@@ -202,9 +181,6 @@ const LEARNING_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_s
 
 /// 输入统计文件名，与学习数据同目录（按天一行，见 `qingjian-learning::UsageStats`）。
 const USAGE_FILE: &str = "usage.tsv";
-
-/// 检查更新的结果文件名，与学习数据同目录（见 `qingjian-update::UpdateState`）。
-const UPDATE_STATE_FILE: &str = "update.json";
 
 /// 词汇记录文件名，与学习数据同目录（一个译词一行，见 `qingjian-learning::VocabularyBook`）。
 const VOCABULARY_FILE: &str = "user-vocab.tsv";

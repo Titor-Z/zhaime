@@ -18,6 +18,26 @@ fn partial_file_keeps_other_defaults() {
     assert_eq!(config.predict.api_key_env, "QINGJIAN_API_KEY");
 }
 
+/// 本地整句模型与检查更新已移除，但老用户机器上的 `config.toml` 里还留着 `[model]` / `[update]`：
+/// 解析要照旧成功（`Config` 是 `#[serde(default)]` 且不拒未知字段），那两个分节被安静忽略，
+/// 其余配置照常生效，不该让人升级后输入法读不出配置。
+#[test]
+fn removed_sections_in_an_old_file_are_ignored() {
+    let config: Config = toml::from_str(
+        "[general]\npage_size = 5\n[model]\nenabled = true\n[update]\ncheck = true\nchannel = \"beta\"\n",
+    )
+    .unwrap();
+    assert_eq!(config.general.page_size(), 5);
+    assert!(!config.predict.enabled);
+    // 被移除的两个分节没有在 Config 上留下任何痕迹，读进来再写出去就不会复活
+    let written = toml::to_string(&config).unwrap();
+    assert!(!written.contains("[model]"), "不该再写出 [model]：\n{written}");
+    assert!(!written.contains("[update]"), "不该再写出 [update]：\n{written}");
+    // 同一个文件读两遍仍然读得出（老配置不会被写坏）
+    let again: Config = toml::from_str(&written).unwrap();
+    assert_eq!(again.general.page_size(), 5);
+}
+
 #[test]
 fn fuzzy_section_parses() {
     let config: Config = toml::from_str("[fuzzy]\nz_zh = true\nan_ang = true\n").unwrap();
@@ -38,7 +58,8 @@ fn general_and_shortcut_sections_parse() {
     assert_eq!(config.general.theme_id(), DEFAULT_THEME);
     assert_eq!(config.general.layout, LayoutMode::Horizontal);
     assert_eq!(config.general.preedit, PreeditMode::Window);
-    assert_eq!(config.general.learning_language, "en");
+    // 缺省不显示译文（要显示得在配置里显式写 learning_language）
+    assert_eq!(config.general.learning_language, "off");
     assert!(config.general.english_candidates);
     assert!(config.general.emoji);
     assert!(config.general.english_in_chinese);

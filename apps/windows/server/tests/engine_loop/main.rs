@@ -5,7 +5,6 @@ mod click;
 mod composing;
 mod english;
 mod modes;
-mod rescoring;
 mod shortcuts;
 mod status;
 mod support;

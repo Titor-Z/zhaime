@@ -17,7 +17,7 @@ pub enum Kind {
     /// 英文词表。
     WordList = 5,
 
-    /// 本地整句模型（`qingjian-neural::CharScorer`，扩展名 `.qjm`）。
+    /// 本地整句模型（已停用）：编号 6 留在这里是历史文件头的一部分，改了旧 `.qjm` 就打不开了。
     Model = 6,
 
     /// 辅码码表（`qingjian-dictionary::AuxCodeTable`）：词 → 码的映射，辅码态逐键即筛用。

@@ -80,7 +80,6 @@ impl Host {
                     open_with_system(&[&dir.to_string_lossy()]);
                 }
             }
-            MenuAction::OpenDownload => open_with_system(&[qingjian_update::DOWNLOAD_URL]),
         }
     }
 
@@ -361,17 +360,6 @@ impl Host {
             (Setting::CloudEnabled, SettingValue::Bool(on)) => {
                 self.settings.set_bool("predict", "enabled", on);
             }
-            (Setting::LocalModelEnabled, SettingValue::Bool(on)) => {
-                self.settings.set_bool("model", "enabled", on);
-            }
-            (Setting::UpdateCheck, SettingValue::Bool(on)) => {
-                self.settings.set_bool("update", "check", on);
-            }
-            (Setting::UpdateChannel, SettingValue::Index(index)) => {
-                if let Some(channel) = UpdateChannel::ALL.get(index) {
-                    self.settings.set_value("update", "channel", channel.key());
-                }
-            }
             (Setting::CloudSlots, SettingValue::Index(index)) => {
                 self.settings.set_value("predict", "slots", index as i64);
             }
@@ -488,17 +476,6 @@ impl Host {
             (Setting::VerboseLog, SettingValue::Bool(on)) => {
                 let level = if on { LogLevel::Debug } else { LogLevel::Info };
                 self.settings.set_value("general", "log_level", level.key());
-            }
-            (Setting::CheckUpdateNow, _) => {
-                if let Some(updates) = &self.updates {
-                    updates.check_now(&self.settings.config().update);
-                }
-                self.sync_update();
-                return;
-            }
-            (Setting::OpenDownload, _) => {
-                open_with_system(&[qingjian_update::DOWNLOAD_URL]);
-                return;
             }
             (Setting::OpenWebsite, _) => {
                 open_with_system(&[crate::preferences::WEBSITE_URL]);

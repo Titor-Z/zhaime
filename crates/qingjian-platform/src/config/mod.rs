@@ -8,7 +8,6 @@ mod general;
 mod key_combo;
 mod layout_mode;
 mod log_level;
-mod model;
 mod modifiers;
 mod preedit_mode;
 mod scheme;
@@ -16,7 +15,6 @@ mod shift_letter;
 mod shortcut;
 mod status_bar;
 mod switch_key;
-mod update;
 
 use std::path::Path;
 
@@ -43,7 +41,6 @@ pub use general::{
 pub use key_combo::KeyCombo;
 pub use layout_mode::LayoutMode;
 pub use log_level::LogLevel;
-pub use model::LocalModelConfig;
 pub use modifiers::Modifiers;
 pub use preedit_mode::PreeditMode;
 pub use scheme::{Scheme, scheme_label, scheme_name};
@@ -51,7 +48,6 @@ pub use shift_letter::ShiftLetter;
 pub use shortcut::ShortcutConfig;
 pub use status_bar::StatusBarConfig;
 pub use switch_key::{SwitchKey, SwitchKeys};
-pub use update::{UpdateChannel, UpdateConfig};
 
 /// 用户配置文件（TOML）。所有平台同一份格式，缺省值全部在各分节的 `Default` 里。
 ///
@@ -86,12 +82,6 @@ pub struct Config {
 
     /// 悬浮状态条（桌面上常驻、可拖动的中 / 英浮窗）。
     pub status_bar: StatusBarConfig,
-
-    /// 本地整句模型。
-    pub model: LocalModelConfig,
-
-    /// 检查更新。
-    pub update: UpdateConfig,
 }
 
 fn deserialize_phrases<'de, D: serde::Deserializer<'de>>(
@@ -205,7 +195,8 @@ pub const TEMPLATE: &str = concat!(
 
 [general]
 # 学习语言（en 英语 / ja 日语 / es 西班牙语 / de 德语 / off 不显示译文）：候选旁显示哪种语言的译文，要有对应的释义表才生效
-learning_language = "en"
+# 默认 off：不显示译文，也就不加载主释义表
+learning_language = "off"
 # 每页候选数（1–9）
 page_size = 9
 # 翻页键对：前一个上一页、后一个下一页。可选 "[]"、",." 或 "-="
@@ -331,10 +322,6 @@ enabled = false
 # 随包的笔画表也可以在这里关掉；码表由「辅码」设置页导入，或放好文件后在这里管
 disabled = []
 
-[model]
-# 本地整句模型：随包的小模型在本机给整句候选重新排序，全程离线；停顿后几十毫秒生效。关掉只用词库统计
-enabled = true
-
 [predict]
 # 云联想：把光标附近的文本发到下面的接口，让模型补全整句 / 联想下文。默认关闭。
 # 开启后菜单栏的「中 / 英」旁会带一个云朵标识；Secure Input（密码框）里绝不发送。
@@ -366,12 +353,6 @@ enabled = false
 # 记住的屏幕位置（物理像素，拖动后自动写入）；留空则首次出现在屏幕右下角
 # x = 0
 # y = 0
-
-[update]
-# 检查更新：每天向官网（qingjian.app）读一次版本索引，有新版在菜单与设置的「关于」页提示；请求不带任何标识，不自动下载安装
-check = true
-# 渠道：stable 只看正式版；beta 还会提示测试版（alpha / beta / rc）
-channel = "stable"
 "#
 );
 

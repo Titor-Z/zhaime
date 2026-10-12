@@ -1,7 +1,7 @@
 //! 协议分派：把 DLL 发来的 [`ClientMessage`] 交给 Engine，产出回给 DLL 的 [`ServerMessage`]。
 //! 消息分派在 [`message`]，会话在 [`session`]，组句展示状态在 [`composed`]，按键在 [`key`]，
 //! 候选窗口输出在 [`candidates`]，状态条在 [`status`]，翻译选中文字在 [`translate`]，配置热加载在 [`reload`]，
-//! 本地整句模型在 [`rescore`]，形码码表在 [`code`]。
+//! 形码码表在 [`code`]。
 
 mod candidates;
 mod code;
@@ -10,7 +10,6 @@ mod config;
 mod key;
 mod message;
 mod reload;
-mod rescore;
 mod session;
 mod status;
 mod translate;
@@ -20,7 +19,6 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use qingjian_core::Engine;
-use qingjian_platform::LocalModelConfig;
 use qingjian_platform::protocol::{
     ClientMessage, Frame, IndicatorState, InputSettings, ScreenRect, ServerMessage, SessionId,
 };
@@ -32,8 +30,6 @@ use self::composed::Composed;
 pub use self::config::RouterConfig;
 use self::reload::ConfigReload;
 pub use self::reload::{DataDirs, attach_cloud};
-pub use self::rescore::find_model;
-use self::rescore::{ModelLoader, RescoreState};
 use self::session::SessionInfo;
 pub use self::status::{NoopStatusSink, StatusEvent, StatusSink, StatusView};
 use self::translate::Translation;
@@ -107,24 +103,12 @@ pub struct Router {
     /// 上次真正显示的帧与位置：没变就不重画（组字期间的空转 Poll 很多）。
     last_shown: Option<(Frame, Mode, ScreenRect)>,
 
-    /// 本地整句模型（`.qjm` 或三件套目录）；没有模型文件为 `None`。
-    model_path: Option<PathBuf>,
-
     /// 形码码表（`wubi/wubi86.tsv`，启动时找好的，见 [`code::find_code_table`]）；没有为 `None`。
     code_table: Option<PathBuf>,
-
-    /// 进行中的模型加载；加载完接到 Engine 上就清掉。
-    model_loader: Option<ModelLoader>,
-
-    /// 上次套用的 `[model]`，变了才重载 / 卸载。
-    applied_model: LocalModelConfig,
 
     /// DLL 报来的聚焦会话光标前文：云联想按它带 `before` 上下文。TSF 只读光标前文，
     /// `after` 恒为空；组句结束 / 焦点切换即作废（新的组句 DLL 会再送）。
     surrounding_before: String,
-
-    /// 重排的防抖 / 轮询进行态。
-    rescore: RescoreState,
 }
 
 impl Router {
@@ -154,13 +138,19 @@ impl Router {
             ime_active: false,
             last_rect: None,
             last_shown: None,
-            model_path: None,
             code_table: None,
-            model_loader: None,
-            applied_model: LocalModelConfig::default(),
             surrounding_before: String::new(),
-            rescore: RescoreState::default(),
         }
+    }
+
+    /// 主循环下次该多久后来一次 [`Router::tick`]：现在只有配置热加载一件按节拍做的事。
+    pub fn next_tick(&self) -> Duration {
+        reload::CONFIG_POLL_INTERVAL
+    }
+
+    /// 到点了看一遍配置文件有没有被改（热加载）。
+    pub fn tick(&mut self) {
+        self.poll_config_reload();
     }
 
     /// 下发给 DLL 的按键行为设置：`OpenSession` 的回包带一次，之后每拍 `SyncMode` 也跟着走，
@@ -184,7 +174,6 @@ impl Router {
             full_width_punctuation: self.config.full_width,
             english_full_width_punctuation: self.config.english_full_width,
             status_bar: self.config.status_enabled,
-            update_available: self.update_available(),
         }
     }
 

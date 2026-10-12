@@ -195,6 +195,8 @@ impl AuxCodeTable {
             }
             previous = Some(word);
         }
+        // 同 `Dictionary::open_qj`：逐条校验读完的映射页交还内核，别常驻在 RSS 里。
+        container.drop_resident_pages();
         tracing::debug!(
             entries = entries.len(),
             words = word_count,

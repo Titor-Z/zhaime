@@ -39,9 +39,27 @@ impl Container {
         Self::from_map(Arc::new(map), expected)
     }
 
+    /// 把刚被顺序读过的映射页交还给内核（`MADV_DONTNEED`）。
+    ///
+    /// 打开时做完整性校验要顺序扫一遍整个文件，扫完这些干净的文件映射页会留在 RSS 里，
+    /// 大容器（`lm.qj` 几十 MB）就等于常驻了那么多。校验过了就丢掉：页缓存还在，
+    /// 下次访问按需缺页回来，代价是一次 page fault。只读映射所以内容不会被改动。
+    ///
+    /// 不支持 `MADV_DONTNEED` 的平台（Windows）上是空操作——那边本来也没有这个页缓存语义。
+    pub fn drop_resident_pages(&self) {
+        #[cfg(unix)]
+        {
+            use memmap2::UncheckedAdvice;
+            // 内核不支持就返回 Err，忽略即可：这时那些页照旧留在 RSS 里，只是没省到。
+            // SAFETY: `MADV_DONTNEED` 只丢地址映射，不改内容；这是只读的文件映射。
+            let _ = unsafe { self.map.unchecked_advise(UncheckedAdvice::DontNeed) };
+        }
+        #[cfg(not(unix))]
+        {}
+    }
+
     /// 文件开头是不是 `.qj` 魔数（调用方据此在 TSV 与 `.qj` 之间选加载路径）。
-    pub fn is_qj(path: &Path) -> bool {
-        use std::io::Read;
+    pub fn is_qj(path: &Path) -> bool {        use std::io::Read;
         let mut magic = [0u8; MAGIC.len()];
         File::open(path)
             .and_then(|mut f| f.read_exact(&mut magic))

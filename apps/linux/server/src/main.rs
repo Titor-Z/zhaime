@@ -6,7 +6,7 @@ mod paths;
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     use qingjian_core::Language;
     use qingjian_linux_server::{
-        AssemblySpec, LanguageModelFiles, Router, RouterConfig, assembly, find_model,
+        AssemblySpec, LanguageModelFiles, Router, RouterConfig, assembly,
     };
     use qingjian_platform::Config;
     use std::path::PathBuf;
@@ -91,7 +91,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(std::io::Error::other)?;
     engine.log_session(env!("CARGO_PKG_VERSION"), "linux");
     let mut router = Router::new(engine, RouterConfig::from(&config));
-    router.configure_local_model(find_model(Some(&user_dir), &root), &config.model);
     extern "C" fn stop(_: libc::c_int) {
         qingjian_linux_server::ipc::request_shutdown();
     }

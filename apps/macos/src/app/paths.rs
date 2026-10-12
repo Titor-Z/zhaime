@@ -66,26 +66,3 @@ pub fn dicts_dir() -> Option<PathBuf> {
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }
-
-/// 含章·知微（`.qjm` 单文件，或开发时的三件套目录）：
-/// 用户目录 `models/hanzhang-zhiwei/` 优先，兼容旧 `model/`；否则用包里的同名目录。
-pub fn model_path() -> Option<PathBuf> {
-    let user = user_data_dir()?;
-    for dir in ["models/hanzhang-zhiwei", "model"] {
-        if let Some(found) = qingjian_neural::find_model(&user.join(dir)) {
-            return Some(found);
-        }
-    }
-    qingjian_neural::find_model(&resources_dir().ok()?.join("models/hanzhang-zhiwei"))
-}
-
-/// 含章·通变（P2C，带噪拼音 → 汉字）：用户新目录优先，兼容旧 `model-p2c/`。
-pub fn p2c_model_path() -> Option<PathBuf> {
-    let user = user_data_dir()?;
-    for dir in ["models/hanzhang-tongbian", "model-p2c"] {
-        if let Some(found) = qingjian_neural::find_model(&user.join(dir)) {
-            return Some(found);
-        }
-    }
-    qingjian_neural::find_model(&resources_dir().ok()?.join("models/hanzhang-tongbian"))
-}

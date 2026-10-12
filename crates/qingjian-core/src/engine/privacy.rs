@@ -18,7 +18,6 @@ impl Engine {
         if private {
             // 在飞的云结果不能再显示，前文也不能留
             self.prediction_sequence += 1;
-            self.rescoring_before = None;
         }
     }
 

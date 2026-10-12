@@ -40,28 +40,8 @@ impl Engine {
                 let alternates = !self.scope_is_english_word();
                 let sentences = self.plain_sentence(items, best, typos, alternates);
                 let position = leading_english(items);
-                // 词图读不通整段时模型直接生成的整句排在词图那几条前面：这时词图给的是把英文段
-                // 硬读成拼音的结果（`yongdockerbushuhenfangbian` → 用的哦乘客仍不熟很方便），排它前面没有可惜的
-                // `typos` 为假就是拼写纠错已经生效（见调用处），那时 `best` 是纠正后的切分
-                let generated: Vec<Candidate> = self
-                    .generated_sentence_candidates(best, keys, !typos)
-                    .into_iter()
-                    .filter(|g| {
-                        !items
-                            .iter()
-                            .chain(sentences.iter())
-                            .any(|c| c.text == g.text)
-                    })
-                    .collect();
-                let generated_count = generated.len();
-                for (offset, candidate) in generated.into_iter().enumerate() {
-                    items.insert((position + offset).min(items.len()), candidate);
-                }
                 for (offset, plain) in sentences.into_iter().enumerate() {
-                    items.insert(
-                        (position + generated_count + offset).min(items.len()),
-                        plain,
-                    );
+                    items.insert((position + offset).min(items.len()), plain);
                 }
             }
         }
@@ -71,7 +51,7 @@ impl Engine {
     /// 整段本身就是词库里的词时不重复；有音节没转成字的不算句子。
     /// 词级候选里已有同文本同读音的候选时不出（那条留在词级排序给它的位置），同文本不同读音的从 `items` 里去掉。
     ///
-    /// `alternates` 为真且输入够长时把重排后的第 2、3 条路径也给出来（[`SENTENCE_CANDIDATES`] 条封顶）：
+    /// `alternates` 为真且输入够长时把第 2、3 条路径也给出来（[`SENTENCE_CANDIDATES`] 条封顶）：
     /// 长句错一个字就得整句拆开重打，一条候选不够用；短输入不给，那几格留给词级候选更值。
     /// 备选只收真整句（路径上不止一个词），「整段读成一个词」那种噪声信道的判断只认第一条。
     pub(in crate::engine) fn plain_sentence(
@@ -172,9 +152,7 @@ impl Engine {
     }
 
     /// 同 [`Self::convert_sentence`]，`whole` 为真时末尾单字母也读（[`sentence::convert_whole`]），只给比分用。
-    /// 接了神经重打分器时取前 [`RESCORE_PATHS`] 条路径，按「路径分 + λ·(神经分 − 静态分)」重排（[`Self::rescore_paths`]）：
-    /// 神经分替换的是静态二元模型那部分判断，个人 n-gram 插值、用户加分、敲错代价原样保留。
-    /// 返回重排后的第一条；`score` 始终是静态尺度的路径分，神经分不写进去，跨读法的比较才还成立。
+    /// 返回最优路径；`score` 是静态尺度的路径分（个人 n-gram 与用户加分已并进去）。
     pub(in crate::engine) fn convert_sentence_with(
         &self,
         patterns: &[qingjian_dictionary::SyllablePattern<'_>],
@@ -186,8 +164,8 @@ impl Engine {
             .next()
     }
 
-    /// 重排后的整句路径，最好的在前。`want` 是调用方要几条：只要一条时没接模型就只算一条
-    /// （拼写纠错对每个候选都要转一次，多算几条纯是浪费）；要备选时至少算这么多条。
+    /// Viterbi 的前 `want` 条整句路径，最好的在前。`want` 是调用方要几条：
+    /// 只要一条时只算一条（拼写纠错对每个候选都要转一次，多算几条纯是浪费）；要备选时至少算这么多条。
     pub(in crate::engine) fn sentence_paths(
         &self,
         patterns: &[qingjian_dictionary::SyllablePattern<'_>],
@@ -197,31 +175,16 @@ impl Engine {
     ) -> Vec<Conversion> {
         let dictionaries = self.all_dictionaries();
         let expanded = self.expand_positions(patterns, typos);
-        let k = if self.has_sentence_scorer() {
-            RESCORE_PATHS.max(want)
-        } else {
-            want
-        };
-        let mut paths = sentence::convert_paths(
+        sentence::convert_paths(
             &dictionaries,
             &expanded.positions(),
             whole,
-            k,
+            want,
             &*self.language_model,
             self.personal(),
             |text| self.learner.weight(text),
             |index, syllable| expanded.cost(index, syllable),
             &mut self.span_cache.borrow_mut(),
-        );
-        // 与最优路径差得太远的不参与：那种差距多半是个人 n-gram 拉开的
-        if paths.len() > 1 {
-            let floor = paths[0].score - self.neural_margin;
-            paths.retain(|p| p.score >= floor);
-            // 条件是这批路径共同解释的那段按键，不是整个作用域：英文尾巴那条只转换了 head，
-            // 拿整段当条件会让它凭空背上没覆盖的字母
-            let keys: String = patterns.iter().map(|p| p.text).collect();
-            self.rescore_paths(&mut paths, &keys);
-        }
-        paths
+        )
     }
 }

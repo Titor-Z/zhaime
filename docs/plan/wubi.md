@@ -47,7 +47,7 @@ if let Some(code) = self.code {
    `note_displayed`、各壳渲染）本来就吃得下「无切分」的 `Query`。五笔复用这个形状，不新造结果类型。
 2. **不该开的开关变成天然不存在**，而不是散落一地的 `if wubi`。沿用现有套路
    （`engine/correcting.rs:9` 对双拼直接返回 `None`、`engine/setup.rs:70` 的 `modes()` 返回 `ModeKeys::LETTERLESS`），
-   在一个集中判断里关掉：整句 / Viterbi、神经重排、模糊音、拼写纠错与词图敲错边、中英混输、简拼、
+   在一个集中判断里关掉：整句 / Viterbi、模糊音、拼写纠错与词图敲错边、中英混输、简拼、
    v / u / i 前缀快捷键（**`v` 与 `i` 在五笔里是字根键，必须让位**）。
 3. **青简的产品特色全部自动保留。** `Learner`（词频 / 用户词 / 选择学习）、`Translator` + `Glossary` 释义、
    生词本 `VocabularyBook`、CEFR / JLPT 等级、`InputLog`、`UsageStats` 都按「上屏的词」工作，与输入方案无关。

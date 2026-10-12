@@ -127,7 +127,7 @@ impl Engine {
                 .collect(),
             scheme: self.scheme_key(),
             english: self.english_mode,
-            rescored: snapshot.rescored,
+            rescored: false,
             app: self.application.clone(),
             pages: self.page_turns,
             ms,

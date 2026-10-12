@@ -85,7 +85,7 @@
   `[general] input_log` 缺省开，「高级」页开关 + 清空；Core `InputLogger` trait，学习 crate `InputLog` 落盘；离线回放评测与个人模型的数据来源
 - [x] 回放评测（2026-09-05）：CLI `--replay input-log.jsonl`，按来源算首选 / 前五命中率、平均名次，打印没命中的例子；内存学习不写文件
 - [x] 输入日志 v1（2026-09-12，`docs/plan/model-eval.md`）：日志当评测基础设施，每个模型假设先有尺子再立项。新增事件 `session` / `retype`（组句内退格重打、
-  跨上屏相近重打）/ `passthrough` / `prediction` / `break`，上屏行加 `rescored` / `app` / `pages` / `ms`、候选记一页 9 条；空的原样上屏不再记
+  跨上屏相近重打）/ `passthrough` / `prediction` / `break`，上屏行加 `app` / `pages` / `ms`、候选记一页 9 条；空的原样上屏不再记
   （旧日志一半是它）；回放报告加重打、联想接受率、隐式信号（命中 / 未命中两组的翻页与耗时）、重排 / 未重排两组命中
 - [x] 整句评测集（2026-09-08）：CLI `--eval-text <中文文本>...`，用户自己的文本切句、按词库读音转全拼、冷启动还原，`--eval-save` 冻结句子集；
   基线（本仓库 docs + 个人技术笔记 8322 句）：首选 37.6%、字准确率 76.9%，技术文本里的行话（候选 / 词库 / 释义表）是主要丢分处
@@ -168,7 +168,7 @@
     四项都在「设置 → 通用」，DLL 激活时读一次配置
   - [ ] 发版：Certum 开源代码签名证书、`windows-v<版本>` 标签与 CI
 - [x] Linux Fcitx5 第一阶段：Rust Server、默认候选面板、用户目录安装与手动启动（2026-09-18）；未改系统 Fcitx5 的 GTK4 / Qt6 X11 输入已验证
-- [ ] Linux 后续：Server 自绘 X11 窗口、Server 向 GNOME 扩展发送位图、神经重排、自动启动与 Debian 包；各自独立 PR，IBus 暂缓
+- [ ] Linux 后续：Server 自绘 X11 窗口、Server 向 GNOME 扩展发送位图、自动启动与 Debian 包；各自独立 PR，IBus 暂缓
 - [ ] 配置同步
 - [ ] 跨平台词库
 
@@ -212,15 +212,6 @@ Core 永远不联网。第一个实现接 DeepSeek（OpenAI 兼容接口），�
   个人数据量级（一年几百 KB 到几 MB）上，这一步拿到绝大部分个性化收益，成本接近零
 - [x] 个人 trigram（2026-09-06）：与二元一起在线计数，绝对折扣（D = 0.75）回退到二元，不训练；`--replay` 在 423 条日志上与二元持平
   （冷 词 77.7% / 整句 87.0%，带数据 90.2% / 97.1%），三元要数据攒起来才见效，`--typing` 每键最慢 2.7 ms 不变
-- [x] 小 Transformer 实验分支（2026-09-08）：`qingjian-neural`（candle，Metal / Accelerate / CPU），用途「重排整句转换的前 6 条路径」；
-  CLI `--neural` 接，壳未接。回放上词 +0.5、整句 −1.1（静态替换 λ 0.25、前文 64），没过门槛，且尺子有偏，见 `docs/notes/neural-rescoring.md`
-- [x] 整句评测集上过门槛（2026-09-08 晚）：冻结集 8322 句，基线整句首选 37.6%，small λ 0.75 前文 64 到 41.9%（+4.3），
-  不给前文也有 +2.2；翻好 382 句、翻坏 54 句，见 `docs/notes/neural-rescoring.md`
-- [x] 进壳（2026-09-08 晚）：前文 KV 缓存（64 字前文 × 8 条 133 → 28 ms）、Core `engine/rescoring` 异步重排（后台线程 + 文本分数缓存，壳停键 80 ms 请求）、
-  应用光标前文当前文、λ 缺省 0.5、`[model] enabled` 开关与「云服务」页勾选、知微模型现随包放 `Resources/models/hanzhang-zhiwei/`；TextEdit 端到端 候选声称 → 候选生成
-- [x] 模型单文件 `.qjm`（2026-09-12）：`.qj` 容器新种类 `Kind::Model`，三节原样装三件套；`find_model` 先 `.qjm` 再目录；`pack model` / `tools/release/pack-model.sh`；
-  data Release 上传 `model.qjm`，mac `Resources/models/hanzhang-zhiwei/` 与 Windows `data\models\hanzhang-zhiwei` 只带这一个文件
-- [ ] 本地模型后续：个人微调（闲时训练）；权重许可已定与代码一致 GPL-3.0-or-later（2026-09-12，写在 `pack-model.sh`）
 - [ ] 闲时训练：门禁包括接电源、温度、空闲时长；训练数据来自本地输入历史；模型与数据都可一键清除
 - [ ] 评测门槛：留出用户文本上比 n-gram 的困惑度与 top-1 命中率，赢了才默认启用；每次按键推理延迟有上限
 - [ ] 模型文件的版本与迁移
