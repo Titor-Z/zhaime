@@ -132,7 +132,25 @@ fn to_screen(rect: RECT) -> ScreenRect {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Mutex, MutexGuard};
+
     use super::*;
+
+    /// `LAST_LINE_HEIGHT` 是全局状态，两个碰它的测试并行会互相污染：
+    /// `fragment_...` 会把它写成 1082，`oversized_rect_...` 又要求它是 0。
+    /// 测试默认多线程跑，谁先谁后不确定，于是偶发失败（CI 上抓到过）。
+    static LINE_HEIGHT_LOCK: Mutex<()> = Mutex::new(());
+
+    /// 独占这个全局行高：测试开头清零，结束时自动解锁（中毒也照样放锁，不连累后续）。
+    struct LineHeightGuard(#[allow(dead_code)] MutexGuard<'static, ()>);
+
+    impl LineHeightGuard {
+        fn take() -> Self {
+            let guard = LINE_HEIGHT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            LAST_LINE_HEIGHT.store(0, Ordering::Relaxed);
+            Self(guard)
+        }
+    }
 
     fn rect(top: i32, bottom: i32) -> RECT {
         RECT {
@@ -147,7 +165,7 @@ mod tests {
     // 摆放判定不再翻转。
     #[test]
     fn fragment_is_repaired_to_last_line_height() {
-        LAST_LINE_HEIGHT.store(0, Ordering::Relaxed);
+        let _guard = LineHeightGuard::take();
         let mut orphan = rect(1063, 1064);
         assert!(!repair_degenerate(&mut orphan)); // 还没记过行高，照用残片
         assert_eq!(orphan.bottom, 1064);
@@ -164,7 +182,7 @@ mod tests {
     // 整框矩形（整个编辑框那么高）不能当行高记，也不许被补。
     #[test]
     fn oversized_rect_is_neither_stored_nor_repaired() {
-        LAST_LINE_HEIGHT.store(0, Ordering::Relaxed);
+        let _guard = LineHeightGuard::take();
         let mut whole = rect(0, 900);
         assert!(!repair_degenerate(&mut whole));
         assert_eq!(whole.bottom, 900);
