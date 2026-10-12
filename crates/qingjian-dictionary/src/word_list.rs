@@ -76,12 +76,13 @@ impl WordList {
                 continue;
             }
             let mut fields = line.split('\t');
-            let word = fields.next().filter(|s| !s.is_empty()).ok_or(
-                DictionaryError::Line {
+            let word = fields
+                .next()
+                .filter(|s| !s.is_empty())
+                .ok_or(DictionaryError::Line {
                     line: index + 1,
                     reason: "missing word",
-                },
-            )?;
+                })?;
             // 编码缺省为词的小写；显式给的也一律小写化，和查询端一致。
             let code = fields
                 .next()

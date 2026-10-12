@@ -2,7 +2,7 @@
 
 use windows_reactor::*;
 
-use crate::panel::controls::{field, note, page};
+use crate::panel::controls::{note, page};
 use crate::panel::{Message, Settings};
 
 /// QINGJIAN_VERSION 由 build.rs 给：-dev 版接 git 短哈希。
@@ -49,7 +49,7 @@ const PRIVACY_NOTE: &str = "札输入法不上传任何数据，也没有自动�
 
 const FEEDBACK_NOTE: &str = "遇到问题点「打包日志到桌面」，把生成的 zip 发给作者即可（含三个进程的日志与配置文件，不含密钥）。缺省日志不含你敲的内容；排查排序问题时作者可能请你在「高级」页临时打开详细日志。";
 
-pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> View {
+pub(crate) fn view(_settings: &Settings, context: &mut ViewContext<Settings>) -> View {
     let mut attributions: Vec<View> = Vec::with_capacity(ATTRIBUTIONS.len());
     for (name, text) in ATTRIBUTIONS {
         attributions.push(note(&format!("{name}：{text}")));
