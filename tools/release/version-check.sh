@@ -25,12 +25,14 @@ fi
 for manifest in $MANIFESTS; do
   found="$(sed -n 's/^version = "\(.*\)"/\1/p' "$manifest" | head -1)"
   if [[ "$found" != "$version" ]]; then
-    echo "$manifest 是 ${found:-（没读到 version）}，标签 $TAG 要的是 $version —— 发版提交先把各壳版本改成 $version（去掉 -dev）再打标签" >&2
+    echo "$manifest 是 ${found:-（没读到 version）}，标签 $TAG 要的是 ${version} —— 发版提交先把各壳版本改成 ${version}（去掉 -dev）再打标签" >&2
     exit 1
   fi
 done
 
-echo "发版版本 $version（标签 $TAG）"
+# macOS runner 的 /bin/bash 是 3.2：变量名后面紧跟全角字符（`$version（`）会被当成变量名的一部分，
+# 报 unbound variable —— 这里的变量一律加花括号。
+echo "发版版本 ${version}（标签 $TAG）"
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   echo "version=$version" >> "$GITHUB_OUTPUT"
 fi

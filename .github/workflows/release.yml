@@ -120,6 +120,7 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: true
+          overwrite_files: true
           files: target/pkg/*.pkg
 
   windows:
@@ -181,6 +182,7 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: true
+          overwrite_files: true
           files: target/installer/*.exe
 
   linux:
@@ -249,4 +251,5 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: true
+          overwrite_files: true
           files: target/linux-package/*.tar.gz
