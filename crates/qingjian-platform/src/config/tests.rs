@@ -31,8 +31,14 @@ fn removed_sections_in_an_old_file_are_ignored() {
     assert!(!config.predict.enabled);
     // 被移除的两个分节没有在 Config 上留下任何痕迹，读进来再写出去就不会复活
     let written = toml::to_string(&config).unwrap();
-    assert!(!written.contains("[model]"), "不该再写出 [model]：\n{written}");
-    assert!(!written.contains("[update]"), "不该再写出 [update]：\n{written}");
+    assert!(
+        !written.contains("[model]"),
+        "不该再写出 [model]：\n{written}"
+    );
+    assert!(
+        !written.contains("[update]"),
+        "不该再写出 [update]：\n{written}"
+    );
     // 同一个文件读两遍仍然读得出（老配置不会被写坏）
     let again: Config = toml::from_str(&written).unwrap();
     assert_eq!(again.general.page_size(), 5);

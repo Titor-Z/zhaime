@@ -181,3 +181,46 @@ TSV 解析路径也改成产出同样的结构，查询代码只有一份。
    而且解析路径和映射路径共用同一套查询代码。
 6. **性能改动要有对拍或回归。** 收窄算法与线性扫描随机对拍；排序 / 缓存改动跑全部单元测试加固定输入组。
    没有这层保护，`select_nth` 换排序方向这种改动很容易悄悄改掉候选顺序。
+
+## 第九轮：删掉本地整句模型后的内存实测（2026-10-12）
+
+本地整句模型与自动更新已删除（见 roadmap），这一轮量的是删完之后到底占多少。
+
+**怎么量**：`tools/release/measure-memory.sh <命令>`。**不要用 `/usr/bin/time -l` 的 maximum resident set size**——
+那个量的是进程生命周期内的峰值，而 `.qj` 打开时要顺序扫一遍做校验，峰值必然包含「整个文件正在被扫描」的那一刻，
+量不到「扫完之后闲下来」的真实占用。脚本让进程常驻，加载抖动过去后每秒采一次 `ps` 的 RSS 取中位数。
+
+**量到两件事，都与直觉相反**：
+
+1. **`ps` 的 RSS 严重虚高。** 同一进程 `ps` 报 75 MB，`footprint`（macOS 的权威口径）报 **27 MB**。
+   差的那 40 MB 是 `mapped file`——`dict.qj` + `lm.qj` + 两张释义表合计 40 MB 的干净文件映射页。
+   `footprint` 拆解里它们全是 Clean、脏 0 B，**不计入内存压力**。所以看 Activity Monitor 的数字会吓一跳，
+   但那不是真实占用。
+2. **`MADV_DONTNEED` 在 macOS 上无效。** 插桩实测：调用前 RSS 74992 KB，调用后 75000 KB，纹丝不动。
+   `MADV_DONTNEED` 对文件映射在 Darwin 上表现得像 `MADV_FREE`，要等内存压力才回收。
+   A/B 编译（注掉三处调用）对照，稳态 RSS 73.5 MB vs 73.5 MB，完全无差别。Linux 上是真丢。
+
+**数据形态**（`data/generated/`，用 `assets/lexicon/dict.tsv` 打的真词库 + 等规模的合成语言模型）：
+
+| 文件 | 体积 | 计入 footprint |
+|---|---|---|
+| `dict.qj` | 3.4 MB | 否（mmap 干净页） |
+| `lm.qj` | 19 MB | 否 |
+| `glossary-en.qj` | 15 MB | 否 |
+| `glossary-zh.qj` | 2.7 MB | 否 |
+| `english.tsv` | 2.1 MB | **是**（`read_to_string` 进堆） |
+
+**footprint 拆解（CLI，产品同款数据）**：
+
+```
+Footprint: 27 MB
+  17 MB  MALLOC_LARGE            堆：词频表、个人 n-gram、english.tsv、查询缓存
+6152 KB MALLOC_NANO
+  3.5 MB MALLOC_LARGE_REUSABLE   可回收
+  40 MB  mapped file (Clean)     不计入
+```
+
+**结论**：`.qj` 那一套 mmap 数据几乎不占内存压力，这是这套设计的最大功劳；footprint 的 27 MB 里大头是堆。
+要再往下降，方向是削堆（砍 `english.tsv` 进堆的部分、缩小词频/n-gram 表）而不是动 mmap。
+另外这个数字**只是 CLI**——macOS 壳还要加上 AppKit、IMK 与自绘渲染器（字体 + cosmic-text 整形缓存），
+真机数字必须在装成输入法后用 `footprint -p $(pgrep -f qingjian-macos)` 量。

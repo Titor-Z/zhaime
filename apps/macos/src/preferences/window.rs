@@ -12,8 +12,8 @@ use qingjian_platform::Config;
 use super::controls::{language_label, small_label};
 use super::layout::{Layout, PAGE_PADDING, PAGE_WIDTH};
 use super::pages::{
-    AdvancedPage, CandidatesPage, CloudPage, DictionariesPage, FuzzyPage, GeneralPage,
-    PhrasesPage, ShortcutsPage, UsagePage, build_about,
+    AdvancedPage, CandidatesPage, CloudPage, DictionariesPage, FuzzyPage, GeneralPage, PhrasesPage,
+    ShortcutsPage, UsagePage, build_about,
 };
 use super::panel::PreferencesPanel;
 use super::target::PreferencesTarget;

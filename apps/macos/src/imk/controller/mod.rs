@@ -164,8 +164,6 @@ define_class!(
 /// 翻译选中文字最多接受多少个字符：再长既慢又贵，也不是输入法该干的事。
 const MAX_TRANSLATE_CHARS: usize = 500;
 
-/// 给本地整句模型看的光标前文最多读多少字符（Engine 自己再按它的前文长度截）。
-
 /// 登录 / 锁屏窗口的 bundle identifier。
 const LOGIN_WINDOW: &str = "com.apple.loginwindow";
 

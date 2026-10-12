@@ -106,9 +106,9 @@ TSV 解析、查询与生成工具把 `lue` / `nue` 统一成 `lve` / `nve`。
 生成 `data/generated/{dict,lm}.qj`，`bundle.sh` 在 TSV 更新时自动重打并只把 `.qj` 打进包。设计见 `docs/design/architecture.md`「数据文件：`.qj` 容器」。
 
 `Container::drop_resident_pages`：`open_qj` 时为了查坏文件会顺序扫一遍整个分节（词库的槽位、语言模型的 CSR 与哈希索引），
-扫完这些干净的文件映射页会留在 RSS 里——`lm.qj` 几十 MB 就等于常驻了几十 MB。校验过了就 `MADV_DONTNEED` 把页交还内核，
-查询时按需缺页回来（页缓存还在，代价是一次 page fault）。`qingjian-dictionary` 的 `open_qj` 与 `AuxCodeTable::open`、
-`qingjian-lm` 的 `BigramModel::from_path` 都在校验后调它。只读映射所以内容不会被改动；Windows 上是空操作。
+扫完的文件映射页会留在 RSS 里，于是校验过后 `MADV_DONTNEED` 把它们交还内核。`qingjian-dictionary` 的 `open_qj` 与
+`AuxCodeTable::open`、`qingjian-lm` 的 `BigramModel::from_path` 都在校验后调它。**macOS 上这是空操作**（见
+[performance.md](performance.md) 的内存实测），留着的实际收益只有 Linux 上那点 RSS。
 
 ## crates/qingjian-lm
 

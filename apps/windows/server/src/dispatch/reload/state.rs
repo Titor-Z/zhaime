@@ -5,9 +5,7 @@ use std::time::{Instant, SystemTime};
 
 use qingjian_core::Language;
 use qingjian_dictionary::Dictionary;
-use qingjian_platform::{
-    AuxCodeConfig, DictionariesConfig, code_tables, extra_dictionaries,
-};
+use qingjian_platform::{AuxCodeConfig, DictionariesConfig, code_tables, extra_dictionaries};
 use qingjian_predict::PredictConfig;
 
 /// 随包与用户数据目录：启动与热加载用的是同一批（词库、码表）。

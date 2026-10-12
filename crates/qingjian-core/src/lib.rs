@@ -36,9 +36,10 @@ pub use engine::{
     Engine, EngineSession, FRESH_UNTIL, FilledGloss, Forgotten, GlossFiller, INPUT_LOG_VERSION,
     InputLogEntry, InputLogger, InputSource, Learner, LevelCount, MarkedKind, MarkedSegment,
     ModeKeys, NoGlossFiller, NoInputLogger, NoLearner, NoPredictor, NoTranslator, NoUsageMeter,
-    NoVocabularyTracker, Prediction, PredictionKind, PredictionPolicy, PredictionRequest, Predictor,
-    QUESTION_PREFIX, Query, RawPreedit, SurroundingText, Timings, Translator, Usage, UsageMeter,
-    UsageSummary, VocabularySummary, VocabularyTracker, book_scale, is_valid_aux_code_key,
+    NoVocabularyTracker, Prediction, PredictionKind, PredictionPolicy, PredictionRequest,
+    Predictor, QUESTION_PREFIX, Query, RawPreedit, SurroundingText, Timings, Translator, Usage,
+    UsageMeter, UsageSummary, VocabularySummary, VocabularyTracker, book_scale,
+    is_valid_aux_code_key,
 };
 pub use fuzzy::FuzzyRules;
 pub use history::InputHistory;

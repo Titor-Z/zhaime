@@ -5,9 +5,7 @@ mod paths;
 #[cfg(target_os = "linux")]
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     use qingjian_core::Language;
-    use qingjian_linux_server::{
-        AssemblySpec, LanguageModelFiles, Router, RouterConfig, assembly,
-    };
+    use qingjian_linux_server::{AssemblySpec, LanguageModelFiles, Router, RouterConfig, assembly};
     use qingjian_platform::Config;
     use std::path::PathBuf;
     if std::env::args().any(|arg| arg == "--version") {

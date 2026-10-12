@@ -118,10 +118,15 @@ fn build_engine(args: &Args) -> Result<Engine, CliError> {
         .dict
         .clone()
         .unwrap_or_else(|| args::default_data_file("dict.tsv"));
-    let glossary_path = args
-        .glossary
-        .clone()
-        .unwrap_or_else(|| args::default_data_file(&format!("glossary-{}.tsv", language.code())));
+    // 与产品一致：打包过的 .qj（mmap）优先，没有才读 TSV（会全量进堆，慢一个量级）
+    let glossary_path = args.glossary.clone().unwrap_or_else(|| {
+        let packed = args::default_data_file(&format!("glossary-{}.qj", language.code()));
+        if packed.is_file() {
+            packed
+        } else {
+            args::default_data_file(&format!("glossary-{}.tsv", language.code()))
+        }
+    });
 
     let started = Instant::now();
     let dictionary = Dictionary::from_path(&dict_path)?;
@@ -165,7 +170,12 @@ fn build_engine(args: &Args) -> Result<Engine, CliError> {
         engine.set_extra_dictionaries(extras);
     }
     // 英文候选的中文释义可选
-    let zh_glossary = args::default_data_file("glossary-zh.tsv");
+    let packed_zh = args::default_data_file("glossary-zh.qj");
+    let zh_glossary = if packed_zh.is_file() {
+        packed_zh
+    } else {
+        args::default_data_file("glossary-zh.tsv")
+    };
     if zh_glossary.is_file() {
         let glossary = Glossary::from_path(Language::Chinese, &zh_glossary)?;
         tracing::info!(glosses = glossary.len(), "英→中释义表已加载");

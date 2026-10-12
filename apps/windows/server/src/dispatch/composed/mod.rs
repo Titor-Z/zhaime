@@ -106,7 +106,8 @@ impl Router {
     }
 
     /// DLL 送来新的光标前文后重发一次云联想：作废在飞的空上下文请求，让云端拿得到 before。
-    pub(super) fn refresh_prediction(&mut self) {        let Some(Composed::Candidates { layout, .. }) = &self.composed else {
+    pub(super) fn refresh_prediction(&mut self) {
+        let Some(Composed::Candidates { layout, .. }) = &self.composed else {
             return;
         };
         let local = layout.local().to_vec();
@@ -353,7 +354,9 @@ mod tests {
             session: SessionId(1),
             text: "别的内容".to_owned(),
         });
-        router.handle(ClientMessage::Commit { session: SessionId(1) });
+        router.handle(ClientMessage::Commit {
+            session: SessionId(1),
+        });
         assert!(router.surrounding_for_prediction().is_none());
     }
 
