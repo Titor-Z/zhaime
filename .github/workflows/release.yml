@@ -57,8 +57,14 @@ jobs:
       - name: Fetch product data
         run: tools/release/data-fetch.sh
 
+      - name: Detect optional secrets
+        id: optional
+        run: |
+          echo "sign=${{ secrets.ZHA_CERT_P12 != '' }}" >> "$GITHUB_OUTPUT"
+          echo "notarize=${{ secrets.ZHA_NOTARY_KEY != '' }}" >> "$GITHUB_OUTPUT"
+
       - name: Import signing certificates
-        if: env.ZHA_CERT_P12 != ''
+        if: steps.optional.outputs.sign == 'true'
         env:
           ZHA_CERT_P12: ${{ secrets.ZHA_CERT_P12 }}
           ZHA_CERT_PASSWORD: ${{ secrets.ZHA_CERT_PASSWORD }}
@@ -80,7 +86,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Store notarization credentials
-        if: secrets.ZHA_NOTARY_KEY != ''
+        if: steps.optional.outputs.notarize == 'true'
         env:
           ZHA_NOTARY_KEY: ${{ secrets.ZHA_NOTARY_KEY }}
           ZHA_NOTARY_KEY_ID: ${{ secrets.ZHA_NOTARY_KEY_ID }}
